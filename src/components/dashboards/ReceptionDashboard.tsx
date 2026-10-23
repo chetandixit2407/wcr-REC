@@ -1,0 +1,1222 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  Building,
+  UserCheck,
+  LogOut,
+  MapPin,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  UserPlus,
+  Sparkles,
+  QrCode,
+  ArrowRight,
+  Camera,
+  ShieldCheck,
+  FileText,
+  Eye,
+  AlertTriangle,
+  User,
+  Search,
+  MessageSquare,
+  Building2,
+  ChevronDown,
+  Layers,
+  ChevronRight,
+  EyeOff,
+  Edit3,
+  Trash2,
+  RotateCcw,
+  X,
+} from 'lucide-react';
+import type { Candidate, Room, Visitor, ActionTask } from '../../types/index.ts';
+import { ReceptionPhotoModal } from '../ReceptionPhotoModal.tsx';
+import { CandidateDossierModal } from '../CandidateDossierModal.tsx';
+import { VisitorArrivalTimeline, type ArrivalStage } from '../VisitorArrivalTimeline.tsx';
+import { formatPhotoTimestamp } from '../../utils/dateFormatter.ts';
+import { authenticatedFetch } from '../../utils/apiClient.ts';
+import { EditRecordModal } from '../modals/EditRecordModal.tsx';
+import { DeleteConfirmModal, DeleteRecordType } from '../modals/DeleteConfirmModal.tsx';
+import { formatCandidateLocation } from '../../utils/candidateHelpers.ts';
+import { CandidateAvatar } from '../CandidateAvatar.tsx';
+
+
+interface ReceptionDashboardProps {
+  candidates: Candidate[];
+  rooms: Room[];
+  visitors: Visitor[];
+  filterStage?: ArrivalStage | null;
+  onClearFilterStage?: () => void;
+  actionTasks?: ActionTask[];
+  onAcknowledgeTask?: (taskId: string) => void;
+  onCompleteTask?: (taskId: string) => void;
+  onCheckout: (candidateId: string) => void;
+  onOpenCheckIn: () => void;
+  onOpenWalkIn: () => void;
+  onOpenQR: () => void;
+  onOpenChat?: () => void;
+  onOpenChatWithContext?: (options: {
+    candidateId?: string;
+    roomId?: string;
+    channelId?: string;
+    recipientId?: string;
+    initialMessage?: string;
+  }) => void;
+  onRefresh?: () => void;
+  onOpenMore?: (section?: 'all' | 'lounge' | 'meetings' | 'checkout') => void;
+  onRecordDeleted?: (id: string, type: DeleteRecordType) => void;
+}
+
+export const ReceptionDashboard: React.FC<ReceptionDashboardProps> = ({
+  candidates,
+  rooms,
+  visitors,
+  filterStage,
+  onClearFilterStage,
+  actionTasks = [],
+  onAcknowledgeTask,
+  onCompleteTask,
+  onCheckout,
+  onOpenCheckIn,
+  onOpenWalkIn,
+  onOpenQR,
+  onOpenChat,
+  onOpenChatWithContext,
+  onRefresh,
+  onOpenMore,
+  onRecordDeleted,
+}) => {
+  const [selectedPhotoCandidate, setSelectedPhotoCandidate] = useState<Candidate | null>(null);
+  const [selectedProfileCandidateId, setSelectedProfileCandidateId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'WAITING' | 'IN_MEETING' | 'CHECKOUT' | 'WALK_IN' | 'PRIORITY' | 'VISITORS'>('ALL');
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [showSecondarySections, setShowSecondarySections] = useState(false);
+  const moreMenuRef = React.useRef<HTMLDivElement>(null);
+
+  // Automatically clear conflicting local filters when dashboard card is clicked
+  useEffect(() => {
+    if (filterStage) {
+      setSearchQuery('');
+      setActiveFilter('ALL');
+    }
+  }, [filterStage]);
+
+  // Edit / Delete Modal State
+  const [editModal, setEditModal] = useState<{
+    isOpen: boolean;
+    recordType: DeleteRecordType;
+    record: any;
+  }>({
+    isOpen: false,
+    recordType: 'CANDIDATE',
+    record: null,
+  });
+
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    recordType: DeleteRecordType;
+    recordId: string;
+    recordName: string;
+    metadata?: Record<string, any>;
+  }>({
+    isOpen: false,
+    recordType: 'CANDIDATE',
+    recordId: '',
+    recordName: '',
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    if (isMoreMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMoreMenuOpen]);
+
+  // Filter reception-targeted actionable alert tasks
+  const receptionTasks = actionTasks.filter(
+    (t) => (t.targetRole === 'RECEPTION' || t.taskType === 'ESCORT_CANDIDATE') && t.status !== 'DISMISSED'
+  );
+
+  // Real-time EventSource listener for instant reception updates
+  useEffect(() => {
+    const es = new EventSource('/api/events?role=RECEPTION');
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (
+          data.type === 'CANDIDATE_FORM_SUBMITTED' ||
+          data.type === 'CANDIDATE_ARRIVED' ||
+          data.type === 'CANDIDATE_LIVE_PHOTO_CAPTURED' ||
+          data.type === 'ROOM_ASSIGNED' ||
+          data.type === 'INTERVIEW_COMPLETED' ||
+          data.type === 'CANDIDATE_CHECKED_OUT'
+        ) {
+          if (onRefresh) onRefresh();
+        }
+      } catch (err) {
+        console.error('Reception SSE error', err);
+      }
+    };
+
+    return () => {
+      es.close();
+    };
+  }, [onRefresh]);
+
+  const filteredCandidates = candidates.filter((c) => {
+    const matchesSearch =
+      (c.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.position || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.phone || '').includes(searchQuery);
+
+    if (!matchesSearch) return false;
+
+    if (activeFilter === 'WAITING') return c.status === 'ARRIVED' || c.status === 'WAITING';
+    if (activeFilter === 'IN_MEETING') return c.status === 'IN_INTERVIEW' || c.status === 'ROOM_ASSIGNED';
+    if (activeFilter === 'CHECKOUT')
+      return c.status === 'COMPLETED' || c.status === 'OFFERED' || c.status === 'REJECTED';
+    if (activeFilter === 'WALK_IN')
+      return (c as any).registrationSource === 'WALK_IN' || (c as any).isWalkIn;
+    if (activeFilter === 'PRIORITY')
+      return c.status === 'ARRIVED' || (c as any).isPriority;
+    
+    // When a stage card is active, do not exclude checked-out or scheduled candidates
+    if (filterStage) return true;
+    return c.status !== 'CHECKED_OUT';
+  });
+
+  const activeCandidates = filterStage
+    ? candidates
+    : candidates.filter(
+        (c) => c.status !== 'CHECKED_OUT' && c.status !== 'SCHEDULED'
+      );
+  const waitingCandidates = candidates.filter(
+    (c) => c.status === 'ARRIVED' || c.status === 'WAITING'
+  );
+  const roomAssignedCandidates = candidates.filter((c) => c.status === 'ROOM_ASSIGNED');
+  const readyForCheckout = candidates.filter(
+    (c) => c.status === 'COMPLETED' || c.status === 'OFFERED' || c.status === 'REJECTED'
+  );
+  const walkInCandidates = candidates.filter(
+    (c) => ((c as any).registrationSource === 'WALK_IN' || (c as any).isWalkIn) && c.status !== 'CHECKED_OUT'
+  );
+  const priorityCandidates = candidates.filter(
+    (c) => (c.status === 'ARRIVED' || (c as any).isPriority) && c.status !== 'CHECKED_OUT'
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Front Desk Bar */}
+      <div className="p-6 card-dark bg-[#0B0B0D] text-white rounded-3xl border border-white/10 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <h1 className="text-xl font-bold text-white tracking-tight">
+              Front Desk Reception & Escort Terminal
+            </h1>
+          </div>
+          <p className="text-xs text-[#E0E0E0] mt-1">
+            Real-time candidate intake, visitor timeline verification, live desk photo capture, and physical checkout.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={onOpenWalkIn}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition cursor-pointer flex items-center gap-1.5"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Intake Walk-in / Client</span>
+          </button>
+          <button
+            onClick={onOpenQR}
+            className="px-3.5 py-2 bg-white/6 hover:bg-white/10 text-slate-200 font-semibold text-xs rounded-xl border border-white/8 transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <QrCode className="w-3.5 h-3.5 text-amber-400" />
+            <span>Reception QR Standees</span>
+          </button>
+          {onOpenChat && (
+            <button
+              onClick={onOpenChat}
+              className="px-3.5 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-semibold text-xs rounded-xl border border-amber-500/30 transition flex items-center gap-1.5 cursor-pointer"
+              title="Open Internal Office Chat"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+              <span>Office Chat</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 🚨 PROMINENT REAL-TIME ACTION ALERTS & ESCORT TASK CARDS */}
+      {receptionTasks.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-5 glass-panel-elevated rounded-3xl space-y-3 border border-amber-500/40 shadow-2xl shadow-amber-500/10"
+        >
+          <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-white/8">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500"></span>
+              </span>
+              <div>
+                <h2 className="text-sm font-black text-amber-300 tracking-wide uppercase flex items-center gap-1.5 font-mono">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>Immediate Action Tasks & Escort Alerts ({receptionTasks.length})</span>
+                </h2>
+                <p className="text-[11px] text-slate-300">
+                  Real-time operational candidate escort instructions synchronized directly from HR & Office Chat.
+                </p>
+              </div>
+            </div>
+
+            {onOpenChatWithContext && (
+              <button
+                onClick={() =>
+                  onOpenChatWithContext({
+                    channelId: 'reception',
+                    initialMessage: 'Reception acknowledged: Escorting candidate now.',
+                  })
+                }
+                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Open Reception Chat</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 pt-1">
+            {receptionTasks.map((task) => {
+              const isPending = task.status === 'PENDING';
+              const isAcknowledged = task.status === 'ACKNOWLEDGED' || task.status === 'IN_PROGRESS';
+              const isCompleted = task.status === 'COMPLETED';
+
+              return (
+                <div
+                  key={task.id}
+                  className={`p-5 sm:p-6 rounded-2xl border transition shadow-xl relative flex flex-col justify-between ${
+                    isPending
+                      ? 'glass-panel border-amber-400/80 ring-2 ring-amber-500/25'
+                      : isAcknowledged
+                      ? 'glass-panel border-sky-400/70 ring-1 ring-sky-500/25'
+                      : 'glass-panel-subtle border-emerald-500/40 opacity-80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3 pb-3 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-black text-sm border border-amber-500/35 shrink-0 shadow-xs">
+                        {task.senderName ? task.senderName.substring(0, 2).toUpperCase() : 'HR'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-white truncate flex items-center gap-2">
+                          <span>{task.senderName}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-amber-300 border border-white/15">
+                            {task.senderRole}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      {isPending && (
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/50 flex items-center gap-1.5 animate-pulse font-mono">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          PENDING
+                        </span>
+                      )}
+                      {isAcknowledged && (
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/50 flex items-center gap-1.5 font-mono">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
+                          ESCORTING
+                        </span>
+                      )}
+                      {isCompleted && (
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 flex items-center gap-1.5 font-mono">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          COMPLETED
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="py-4 space-y-3">
+                    <div className="text-sm sm:text-base font-bold text-white tracking-tight leading-snug">
+                      {task.title || `Bring ${task.candidateName || 'Candidate'} to ${task.destinationRoomName || 'Room'}`}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-[#25272B] card-inner inner-box border border-white/10">
+                        <span className="text-[11px] font-bold text-[#BDBDBD] uppercase tracking-wider block font-mono">
+                          Candidate
+                        </span>
+                        <span className="text-sm font-bold text-amber-300 truncate block mt-1">
+                          {task.candidateName || 'Candidate'}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-[#25272B] card-inner inner-box border border-white/10">
+                        <span className="text-[11px] font-bold text-[#BDBDBD] uppercase tracking-wider block font-mono">
+                          Destination Room
+                        </span>
+                        <span className="text-sm font-bold text-emerald-400 truncate block mt-1">
+                          {task.destinationRoomName || 'Room'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                    {onOpenChatWithContext && (
+                      <button
+                        onClick={() =>
+                          onOpenChatWithContext({
+                            candidateId: task.candidateId,
+                            roomId: task.destinationRoomId,
+                            channelId: 'reception',
+                            initialMessage: `Reception alert response: Regarding ${task.candidateName || 'candidate'}, escort in progress.`,
+                          })
+                        }
+                        className="text-xs text-amber-300 hover:underline flex items-center gap-1.5 font-semibold cursor-pointer"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat Thread &rarr;</span>
+                      </button>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      {isPending && onAcknowledgeTask && (
+                        <button
+                          onClick={() => onAcknowledgeTask(task.id)}
+                          className="px-3.5 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs rounded-xl transition shadow cursor-pointer"
+                        >
+                          Acknowledge Escort
+                        </button>
+                      )}
+                      {(isPending || isAcknowledged) && onCompleteTask && (
+                        <button
+                          onClick={() => onCompleteTask(task.id)}
+                          className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Mark Arrived in Room</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Filter Stage Active Indicator Banner */}
+      {filterStage && (
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-300">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="font-bold text-white">Stage Filter Applied:</span>
+            <span className="font-mono uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+              {filterStage}
+            </span>
+            <span className="text-[#AEB7C4]">
+              ({filteredCandidates.length} candidate records matching stage)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onClearFilterStage?.();
+              setSearchQuery('');
+              setActiveFilter('ALL');
+            }}
+            className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer self-end sm:self-auto"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset / Clear Filter</span>
+          </button>
+        </div>
+      )}
+
+      {/* Filter & Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-[#0B0B0D] dashboard-card card-dark rounded-3xl border border-white/10 shadow-xl relative z-20 overflow-visible">
+        <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto pb-1 sm:pb-0 overflow-visible">
+          <button
+            onClick={() => setActiveFilter('ALL')}
+            className={`wcr-filter-tab px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer shrink-0 border ${
+              activeFilter === 'ALL'
+                ? 'is-active bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-400/50 border-amber-400 font-black'
+                : 'bg-[#0B0B0D] text-white border-white/15 hover:bg-[#1A1D24] hover:text-white hover:border-white/30'
+            }`}
+          >
+            All Active ({activeCandidates.length})
+          </button>
+          <button
+            onClick={() => setActiveFilter('WAITING')}
+            className={`wcr-filter-tab px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer shrink-0 border ${
+              activeFilter === 'WAITING'
+                ? 'is-active bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-400/50 border-amber-400 font-black'
+                : 'bg-[#0B0B0D] text-white border-white/15 hover:bg-[#1A1D24] hover:text-white hover:border-white/30'
+            }`}
+          >
+            Waiting Lounge ({waitingCandidates.length})
+          </button>
+          {/* Primary Tab 3: In Meetings */}
+          <button
+            onClick={() => setActiveFilter('IN_MEETING')}
+            className={`wcr-filter-tab px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer shrink-0 border ${
+              activeFilter === 'IN_MEETING'
+                ? 'is-active bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-400/50 border-amber-400 font-black'
+                : 'bg-[#0B0B0D] text-white border-white/15 hover:bg-[#1A1D24] hover:text-white hover:border-white/30'
+            }`}
+          >
+            In Meetings ({candidates.filter((c) => c.status === 'IN_INTERVIEW' || c.status === 'ROOM_ASSIGNED').length})
+          </button>
+
+          {/* Visitors & Clients Tab */}
+          <button
+            onClick={() => setActiveFilter('VISITORS')}
+            className={`wcr-filter-tab px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer shrink-0 border flex items-center gap-1.5 ${
+              activeFilter === 'VISITORS'
+                ? 'is-active bg-purple-500 text-white shadow-md ring-2 ring-purple-400/50 border-purple-400 font-black'
+                : 'bg-[#0B0B0D] text-white border-white/15 hover:bg-[#1A1D24] hover:text-white hover:border-white/30'
+            }`}
+          >
+            <span>Visitors & Clients ({visitors.length})</span>
+          </button>
+
+          {/* More Menu Dropdown Anchor */}
+          <div className="relative shrink-0" ref={moreMenuRef}>
+            {(() => {
+              const isMoreActive = activeFilter === 'CHECKOUT' || activeFilter === 'WALK_IN' || activeFilter === 'PRIORITY';
+              const activeMoreLabel =
+                activeFilter === 'CHECKOUT'
+                  ? `Ready Checkout (${readyForCheckout.length})`
+                  : activeFilter === 'WALK_IN'
+                  ? `Walk-Ins (${walkInCandidates.length})`
+                  : activeFilter === 'PRIORITY'
+                  ? `Priority (${priorityCandidates.length})`
+                  : null;
+
+              return (
+                <button
+                  type="button"
+                  onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+                  aria-expanded={isMoreMenuOpen}
+                  aria-haspopup="true"
+                  className={`wcr-filter-tab px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer shrink-0 border flex items-center gap-1.5 ${
+                    isMoreActive
+                      ? 'is-active bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-400/50 border-amber-400 font-black'
+                      : isMoreMenuOpen
+                      ? 'bg-[#1F242D] text-white border-white/30'
+                      : 'bg-[#0B0B0D] text-white border-white/15 hover:bg-[#1A1D24] hover:text-white hover:border-white/30'
+                  }`}
+                >
+                  <span>{isMoreActive ? `More: ${activeMoreLabel}` : 'More'}</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                      isMoreMenuOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+              );
+            })()}
+
+            {/* Dropdown Panel */}
+            {isMoreMenuOpen && (
+              <div
+                role="menu"
+                className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-64 bg-white border border-[#E5DFD4] rounded-2xl shadow-2xl p-2 z-[1000] space-y-1 animate-in fade-in zoom-in-95 duration-150 text-[#121316]"
+              >
+                <div className="text-[10px] font-bold text-[#6F727A] px-2.5 py-1 uppercase tracking-wider">
+                  Additional Reception Filters
+                </div>
+
+                {/* Ready Checkout */}
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setActiveFilter('CHECKOUT');
+                    setIsMoreMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer text-left ${
+                    activeFilter === 'CHECKOUT'
+                      ? 'bg-amber-500 text-slate-950 font-black'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <span>Ready Checkout</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20">
+                    {readyForCheckout.length}
+                  </span>
+                </button>
+
+                {/* Walk-In Candidates */}
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setActiveFilter('WALK_IN');
+                    setIsMoreMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer text-left ${
+                    activeFilter === 'WALK_IN'
+                      ? 'bg-amber-500 text-slate-950 font-black'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <span>Walk-In Candidates</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20">
+                    {walkInCandidates.length}
+                  </span>
+                </button>
+
+                {/* Priority / Immediate Arrivals */}
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setActiveFilter('PRIORITY');
+                    setIsMoreMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer text-left ${
+                    activeFilter === 'PRIORITY'
+                      ? 'bg-amber-500 text-slate-950 font-black'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <span>Priority Arrivals</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20">
+                    {priorityCandidates.length}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search candidates / mobile..."
+            className="wcr-search-input w-full pl-8 pr-8 py-1.5 bg-[#111317] border border-white/15 rounded-xl text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/50"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-400 hover:text-white transition cursor-pointer"
+              title="Clear search text"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Secondary Dashboard Sections Summary Banner (Hidden by default, accessible via More) */}
+      <div className="p-4 bg-[#0B0B0D] card-dark rounded-2xl border border-white/10 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <Layers className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-white">Secondary Dashboard Sections</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/10 text-white/70">
+                Hidden by Default
+              </span>
+            </div>
+            <p className="text-white/60 text-[11px] mt-0.5">
+              Lounge Waiting Area, In Active Meetings, and Physical Check-Out terminal are preserved behind More navigation.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              if (onOpenMore) onOpenMore('lounge');
+              else setShowSecondarySections(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold text-xs transition cursor-pointer flex items-center gap-1.5"
+            title="Open Lounge Waiting Area"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <span>Lounge ({waitingCandidates.length})</span>
+          </button>
+          <button
+            onClick={() => {
+              if (onOpenMore) onOpenMore('meetings');
+              else setShowSecondarySections(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-300 font-semibold text-xs transition cursor-pointer flex items-center gap-1.5"
+            title="Open In Active Meetings"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+            <span>Meetings ({candidates.filter((c) => c.status === 'IN_INTERVIEW' || c.status === 'ROOM_ASSIGNED').length})</span>
+          </button>
+          <button
+            onClick={() => {
+              if (onOpenMore) onOpenMore('checkout');
+              else setShowSecondarySections(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-semibold text-xs transition cursor-pointer flex items-center gap-1.5"
+            title="Open Physical Check-Out"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>Check-Out ({readyForCheckout.length})</span>
+          </button>
+          <button
+            onClick={() => {
+              if (onOpenMore) onOpenMore('all');
+              else setShowSecondarySections((prev) => !prev);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition shadow cursor-pointer flex items-center gap-1.5"
+          >
+            <span>{showSecondarySections ? 'Collapse Sections' : 'Open in More →'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Primary Candidate Intake & Verification Roster or Visitors & Clients */}
+      {activeFilter === 'VISITORS' ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between pb-1 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-purple-400" />
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>Official Visitors & Clients Log</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                  {visitors.length}
+                </span>
+              </h3>
+            </div>
+            <span className="text-[11px] text-white/50">
+              Manage client visits, vendor check-ins & appointments
+            </span>
+          </div>
+
+          {visitors.length === 0 ? (
+            <div className="p-12 text-center bg-[#0B0B0D] card-dark rounded-2xl text-sm text-white/60 border border-white/10 shadow-lg">
+              No official visitors or clients recorded for today.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {visitors.map((vis) => (
+                <div
+                  key={vis.id}
+                  className="p-5 sm:p-6 rounded-2xl space-y-4 text-xs sm:text-sm shadow-xl bg-[#0B0B0D] card-dark text-white border border-purple-500/35 hover:border-purple-400/70 transition flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-base sm:text-lg text-white">{vis.fullName}</h4>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                            {vis.visitorType || 'CLIENT'}
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-[13px] text-amber-300 font-semibold mt-0.5">{vis.company || 'Official Guest'}</p>
+                        <p className="text-xs text-white/70 mt-1">
+                          Host: <strong className="text-white">{vis.hostName}</strong>
+                        </p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono border bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shrink-0">
+                        {vis.status || 'CHECKED_IN'}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-black/40 border border-white/8 space-y-1.5 text-xs">
+                      <div className="flex justify-between text-white/80">
+                        <span>Purpose:</span>
+                        <strong className="text-white">{vis.purpose || 'Business Meeting'}</strong>
+                      </div>
+                      <div className="flex justify-between text-white/80">
+                        <span>Phone:</span>
+                        <strong className="text-amber-400 font-mono">{vis.phone || 'N/A'}</strong>
+                      </div>
+                      {vis.checkInTime && (
+                        <div className="flex justify-between text-white/80">
+                          <span>Check-In:</span>
+                          <span className="font-mono text-slate-300">
+                            {new Date(vis.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Clearly visible Edit and Delete buttons for Visitors */}
+                  <div className="pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditModal({
+                            isOpen: true,
+                            recordType: 'VISITOR',
+                            record: vis,
+                          })
+                        }
+                        className="px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition cursor-pointer bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border-white/15"
+                        title="Edit Visitor Information"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDeleteModal({
+                            isOpen: true,
+                            recordType: 'VISITOR',
+                            recordId: vis.id,
+                            recordName: vis.fullName,
+                          })
+                        }
+                        className="px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition cursor-pointer bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border-rose-500/25"
+                        title="Delete Visitor Record"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+
+                    {vis.status !== 'CHECKED_OUT' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          authenticatedFetch(`/api/visitors/${vis.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ...vis, status: 'CHECKED_OUT', checkOutTime: new Date().toISOString() }),
+                          }).then(() => {
+                            if (onRefresh) onRefresh();
+                          });
+                        }}
+                        className="px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition cursor-pointer bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-300 shadow-xs shrink-0"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Check-Out</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+      /* Primary Candidate Intake & Verification Roster */
+      <div className="space-y-3">
+        <div className="flex items-center justify-between pb-1 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400" />
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <span>Primary Candidate Intake Queue</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                {filteredCandidates.length}
+              </span>
+            </h3>
+          </div>
+          <span className="text-[11px] text-white/50">
+            Filtered by: {activeFilter === 'ALL' ? 'All Active' : activeFilter}
+          </span>
+        </div>
+
+        {filteredCandidates.length === 0 ? (
+          <div className="p-12 text-center bg-[#0B0B0D] card-dark rounded-2xl text-sm text-white/60 border border-white/10 shadow-lg">
+            No candidates matching current filter or search query.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredCandidates.map((cand) => {
+              const isWaiting = cand.status === 'ARRIVED' || cand.status === 'WAITING';
+              const isInMeeting = cand.status === 'IN_INTERVIEW' || cand.status === 'ROOM_ASSIGNED';
+              const isCheckoutReady = cand.status === 'COMPLETED' || cand.status === 'OFFERED' || cand.status === 'REJECTED';
+
+              return (
+                <div
+                  key={cand.id}
+                  onClick={() => setSelectedProfileCandidateId(cand.id)}
+                  className="p-5 sm:p-6 rounded-2xl space-y-4 text-xs sm:text-sm shadow-xl cursor-pointer bg-[#0B0B0D] card-dark text-white border border-white/10 hover:border-amber-400/50 flex flex-col justify-between"
+                >
+                  <div className="space-y-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3.5">
+                        <div className="flex flex-col items-center shrink-0">
+                          <CandidateAvatar
+                            candidate={cand}
+                            name={cand.fullName}
+                            sizeClassName="w-14 h-14"
+                            roundedClassName="rounded-2xl"
+                            borderClassName="border-2 border-[#121316]"
+                            fallbackBgClassName="bg-[#FAF8F5]"
+                            fallbackTextClassName="text-[#121316]"
+                          />
+
+                          {(cand.receptionPhotoCapturedAt || cand.arrivalPhotoCapturedAt || cand.livePhotoCapturedAt) && (
+                            <span
+                              className="text-[9px] text-amber-300 font-mono tracking-tight mt-1 text-center truncate max-w-[85px]"
+                              title={`Captured: ${formatPhotoTimestamp(cand.receptionPhotoCapturedAt || cand.arrivalPhotoCapturedAt || cand.livePhotoCapturedAt)}`}
+                            >
+                              {formatPhotoTimestamp(cand.receptionPhotoCapturedAt || cand.arrivalPhotoCapturedAt || cand.livePhotoCapturedAt).split(',')[0]}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-base sm:text-lg flex items-center gap-1.5 text-white">
+                            <span>{cand.fullName}</span>
+                            <Eye className="w-4 h-4 text-slate-400" />
+                          </h4>
+                          <p className="text-xs sm:text-[13px] font-semibold text-amber-300/90 mt-0.5">{cand.position}</p>
+                          <p className="text-xs mt-1 text-white/60">
+                            Arrived: {cand.checkedInAt ? new Date(cand.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 font-mono border ${
+                        isWaiting
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : isInMeeting
+                          ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                          : isCheckoutReady
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-white/10 text-white/80 border-white/15'
+                      }`}>
+                        {cand.status}
+                      </span>
+                    </div>
+
+                    {/* Visitor Lifecycle Stage Tracker */}
+                    <div className="pt-2.5 border-t border-white/10">
+                      <VisitorArrivalTimeline candidate={cand} compact={true} />
+                    </div>
+                  </div>
+
+                  {/* Desk Photo Verification status & Action */}
+                  <div className="pt-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-white/10">
+                    {cand.receptionPhotoUrl || cand.arrivalPhoto ? (
+                      <div className="flex flex-col">
+                        <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          Desk Photo Verified
+                        </span>
+                        {(cand.receptionPhotoCapturedAt || cand.arrivalPhotoCapturedAt) && (
+                          <span className="text-[10px] text-amber-300 font-mono">
+                            Captured: {formatPhotoTimestamp(cand.receptionPhotoCapturedAt || cand.arrivalPhotoCapturedAt)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs italic text-amber-300 font-medium">
+                        Desk Photo Required
+                      </span>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Clearly visible Edit Candidate Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditModal({
+                            isOpen: true,
+                            recordType: 'CANDIDATE',
+                            record: cand,
+                          });
+                        }}
+                        className="p-2 rounded-xl border font-bold text-xs flex items-center transition cursor-pointer bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border-white/15"
+                        title="Edit Candidate Information"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+
+                      {/* Clearly visible Delete Candidate Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteModal({
+                            isOpen: true,
+                            recordType: 'CANDIDATE',
+                            recordId: cand.id,
+                            recordName: cand.fullName,
+                            metadata: { status: cand.status },
+                          });
+                        }}
+                        className="p-2 rounded-xl border font-bold text-xs flex items-center transition cursor-pointer bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border-rose-500/25"
+                        title="Delete / Archive Candidate"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPhotoCandidate(cand);
+                        }}
+                        className="px-3 py-2 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition cursor-pointer bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/40 text-cyan-300 shadow-xs shrink-0"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>{cand.receptionPhotoUrl || cand.arrivalPhoto ? 'Retake Photo' : 'Capture Desk Photo'}</span>
+                      </button>
+
+                      {isCheckoutReady && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCheckout(cand.id);
+                          }}
+                          className="px-3 py-2 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition cursor-pointer bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-emerald-300 shadow-xs shrink-0"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Check-Out</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* Expandable Inline Secondary Sections (Hidden by default, shown only when explicitly toggled) */}
+      {showSecondarySections && (
+        <div className="space-y-4 pt-4 border-t border-white/10">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+              <Layers className="w-4 h-4" />
+              <span>Secondary Sections Inline View</span>
+            </h3>
+            <button
+              onClick={() => setShowSecondarySections(false)}
+              className="text-xs text-white/60 hover:text-white px-2.5 py-1 rounded-lg bg-white/5 border border-white/10"
+            >
+              Hide Secondary Sections
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Waiting Lounge Column */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-1 border-b border-black/10">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  Lounge Waiting Area ({waitingCandidates.length})
+                </h3>
+              </div>
+
+              <div className="space-y-3">
+                {waitingCandidates.length === 0 ? (
+                  <div className="p-8 text-center bg-[#0B0B0D] card-dark rounded-2xl text-xs text-white/60 border border-white/10 shadow-lg">
+                    Lounge is currently clear.
+                  </div>
+                ) : (
+                  waitingCandidates.map((cand) => (
+                    <div
+                      key={cand.id}
+                      onClick={() => setSelectedProfileCandidateId(cand.id)}
+                      className="p-4 rounded-2xl space-y-3 text-xs shadow-xl cursor-pointer bg-[#0B0B0D] card-dark text-white border border-white/10"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <CandidateAvatar
+                            candidate={cand}
+                            name={cand.fullName}
+                            sizeClassName="w-10 h-10"
+                            roundedClassName="rounded-xl"
+                            borderClassName="border-2 border-[#121316]"
+                            fallbackBgClassName="bg-[#FAF8F5]"
+                            fallbackTextClassName="text-[#121316]"
+                          />
+
+                          <div>
+                            <h4 className="font-bold text-sm text-white">{cand.fullName}</h4>
+                            <p className="text-[11px] text-white/70">{cand.position}</p>
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          Waiting
+                        </span>
+                      </div>
+                      <VisitorArrivalTimeline candidate={cand} compact={true} />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* In-Session Meetings Column */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-1 border-b border-black/10">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  In Active Meetings ({candidates.filter((c) => c.status === 'IN_INTERVIEW' || c.status === 'ROOM_ASSIGNED').length})
+                </h3>
+              </div>
+
+              <div className="space-y-3">
+                {candidates
+                  .filter((c) => c.status === 'IN_INTERVIEW' || c.status === 'ROOM_ASSIGNED')
+                  .map((cand) => (
+                    <div
+                      key={cand.id}
+                      onClick={() => setSelectedProfileCandidateId(cand.id)}
+                      className="p-4 rounded-2xl space-y-2.5 text-xs cursor-pointer shadow-xl bg-[#0B0B0D] card-dark border border-blue-500/30 text-white"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-white">{cand.fullName}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold font-mono text-blue-300 bg-blue-500/15 border border-blue-500/30">
+                          {cand.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-white/80">
+                        <span>{cand.position}</span>
+                        <span className="font-semibold text-amber-400 truncate max-w-[150px]">
+                          {cand.assignedRoomName || formatCandidateLocation(cand.currentLocation)}
+                        </span>
+                      </div>
+                      <VisitorArrivalTimeline candidate={cand} compact={true} />
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Physical Checkout Terminal Column */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-1 border-b border-black/10">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Physical Check-Out ({readyForCheckout.length})
+                </h3>
+              </div>
+
+              <div className="space-y-3">
+                {readyForCheckout.length === 0 ? (
+                  <div className="p-8 text-center bg-[#0B0B0D] card-dark rounded-2xl text-xs text-white/60 border border-white/10 shadow-lg">
+                    No visitors currently awaiting checkout.
+                  </div>
+                ) : (
+                  readyForCheckout.map((cand) => (
+                    <div
+                      key={cand.id}
+                      onClick={() => setSelectedProfileCandidateId(cand.id)}
+                      className="p-4 rounded-2xl space-y-3 text-xs shadow-xl cursor-pointer bg-[#0B0B0D] card-dark text-white border border-emerald-500/30"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-bold text-sm text-white">{cand.fullName}</h4>
+                          <p className="text-[11px] text-white/70">{cand.position}</p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                          Completed
+                        </span>
+                      </div>
+                      <VisitorArrivalTimeline candidate={cand} compact={true} />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCheckout(cand.id);
+                        }}
+                        className="w-full py-2 px-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-slate-950 font-bold text-xs rounded-xl shadow transition cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Complete Physical Checkout</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reception Candidate Profile Modal */}
+      {selectedProfileCandidateId && (
+        <CandidateDossierModal
+          candidateId={selectedProfileCandidateId}
+          initialCandidate={candidates.find((c) => c.id === selectedProfileCandidateId)}
+          currentRole="RECEPTION"
+          onClose={() => setSelectedProfileCandidateId(null)}
+          onPhotoCaptured={() => {
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {/* Reception Live Photo Capture Modal */}
+      {selectedPhotoCandidate && (
+        <ReceptionPhotoModal
+          candidate={selectedPhotoCandidate}
+          receptionistId="usr-rec-1"
+          receptionistName="Ananya Sen (Reception)"
+          onClose={() => setSelectedPhotoCandidate(null)}
+          onSuccess={(updated) => {
+            setSelectedPhotoCandidate(null);
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {/* Edit Record Modal */}
+      <EditRecordModal
+        isOpen={editModal.isOpen}
+        recordType={editModal.recordType}
+        record={editModal.record}
+        onClose={() => setEditModal((prev) => ({ ...prev, isOpen: false }))}
+        onSuccess={() => {
+          if (onRefresh) onRefresh();
+        }}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        recordType={deleteModal.recordType}
+        recordId={deleteModal.recordId}
+        recordName={deleteModal.recordName}
+        metadata={deleteModal.metadata}
+        onClose={() => setDeleteModal((prev) => ({ ...prev, isOpen: false }))}
+        onSuccess={(deletedId, recordType) => {
+          if (deletedId && recordType && onRecordDeleted) {
+            onRecordDeleted(deletedId, recordType);
+          }
+          if (onRefresh) onRefresh();
+        }}
+      />
+    </div>
+  );
+};

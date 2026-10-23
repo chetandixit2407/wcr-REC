@@ -1,0 +1,804 @@
+@import "tailwindcss";
+
+@theme {
+  /* ========================================================
+     NIXTIO CREXTIO DESIGN SYSTEM TOKENS
+     Colors: Warm Cream, Pale Yellow, Charcoal Black, Muted Grey
+     ======================================================== */
+  --color-cream-50: #FAF8F5;
+  --color-cream-100: #F7F4EE;
+  --color-cream-200: #F4F0E8; /* Primary canvas background */
+  --color-cream-300: #ECE6DC;
+  --color-cream-400: #E2DDD2;
+  --color-cream-500: #D5CEBF;
+
+  --color-yellow-50: #FEFEEB;
+  --color-yellow-100: #FCFBD4;
+  --color-yellow-200: #FAF6AA;
+  --color-yellow-300: #F7F180;
+  --color-yellow-400: #F5EB78; /* Crextio signature Pale Yellow */
+  --color-yellow-500: #EADB5F;
+  --color-yellow-600: #CCA92E;
+
+  --color-charcoal-50: #F6F7F9;
+  --color-charcoal-100: #EBECEF;
+  --color-charcoal-200: #D2D6DC;
+  --color-charcoal-300: #A8ACB4;
+  --color-charcoal-400: #6F727A; /* Muted Grey */
+  --color-charcoal-500: #555964;
+  --color-charcoal-600: #383B44;
+  --color-charcoal-700: #25272D;
+  --color-charcoal-800: #1B1C21; /* Dark Bento Card */
+  --color-charcoal-900: #121316; /* Deep Charcoal Black */
+
+  /* Aliasing legacy gold & amber tokens to Crextio Yellow & Charcoal scales for 100% component safety */
+  --color-gold-50: #FAF8F5;
+  --color-gold-100: #F7F4EE;
+  --color-gold-200: #FCFBD4;
+  --color-gold-300: #FAF6AA;
+  --color-gold-400: #F5EB78;
+  --color-gold-500: #EADB5F;
+  --color-gold-600: #CCA92E;
+  --color-gold-700: #A8871F;
+  --color-gold-800: #7E6518;
+  --color-gold-900: #121316;
+
+  --color-amber-50: #FAF8F5;
+  --color-amber-100: #F7F4EE;
+  --color-amber-200: #FCFBD4;
+  --color-amber-300: #FAF6AA;
+  --color-amber-400: #F5EB78;
+  --color-amber-500: #EADB5F;
+  --color-amber-600: #CCA92E;
+  --color-amber-700: #A8871F;
+  --color-amber-800: #7E6518;
+  --color-amber-900: #121316;
+}
+
+@layer base {
+  *, ::before, ::after {
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  html {
+    max-width: 100vw;
+    width: 100%;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-synthesis: none;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    max-width: 100vw;
+    width: 100%;
+    overflow-x: hidden;
+    font-family: var(--font-sans);
+    background-color: var(--crextio-bg-canvas);
+    color: var(--crextio-charcoal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  :root {
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+    /* Crextio Palette CSS Variables */
+    --crextio-bg-canvas: #FAF9F6;
+    --crextio-card-bg: #FFFFFF;
+    --crextio-card-border: #E5DFD4;
+    --crextio-card-border-hover: #D5CEBF;
+    --crextio-yellow: #F5EB78;
+    --crextio-yellow-hover: #EFE463;
+    --crextio-charcoal: #121316;
+    --crextio-charcoal-card: #141518;
+    --crextio-muted: #383B42; /* Crisp, high-contrast dark slate */
+    --crextio-inner-bg: #F8F6F0;
+  }
+}
+
+
+/* Custom Scrollbar in Warm Cream & Muted Charcoal */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F4F0E8;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D8D2C5;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B8B0A0;
+}
+
+/* ========================================================
+   NIXTIO CREXTIO CARD ARCHITECTURE
+   - Crisp warm white cards (#FFFFFF) on warm cream canvas (#F4F0E8)
+   - Fine hairline borders (#E5DFD4)
+   - Bold, organic rounded corners (rounded-2xl to rounded-3xl: 20px-24px)
+   - Diffused micro-shadows & smooth hover transitions
+   ======================================================== */
+
+.card-dark,
+.dashboard-card,
+.candidate-card,
+.wcr-card,
+.card-light,
+.candidate-card-light,
+.glass-card,
+.glass-panel,
+.glass-panel-elevated,
+.glass-panel-subtle,
+aside,
+header,
+[class*="bg-[#0B0B0D]"],
+[class*="bg-[#0B0F14]"],
+[class*="bg-[#0F141C]"],
+[class*="bg-[#11161F]"],
+[class*="bg-[#0E131A]"],
+[class*="bg-[#141820]"]:not(button):not(svg),
+[class*="bg-[#17191D]"],
+[class*="bg-[#171D26]"],
+[class*="bg-[#1A1D24]"],
+[class*="bg-[#1B2028]"],
+[class*="bg-[#1B212B]"],
+[class*="bg-[#1F242D]"],
+[class*="bg-[#202124]"]:not(button):not(svg),
+[class*="bg-slate-950"]:not(button):not(input),
+[class*="bg-slate-900"]:not(button):not(input):not(.fixed.inset-0),
+[class*="bg-zinc-950"],
+[class*="bg-zinc-900"],
+[class*="bg-neutral-900"],
+[class*="bg-neutral-950"] {
+  background: #FFFFFF !important;
+  color: #121316 !important;
+  border: 1px solid #E5DFD4 !important;
+  box-shadow: 0 4px 20px -2px rgba(18, 19, 22, 0.04),
+              0 1px 3px 0 rgba(18, 19, 22, 0.02) !important;
+  border-radius: 1.25rem !important; /* 20px smooth corners */
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Dedicated Popup, Modal & Dropdown Visibility System */
+[role="dialog"],
+.modal-container,
+.fixed.inset-0.z-\[9999\],
+.fixed.inset-0.z-50 {
+  z-index: 9999 !important;
+}
+
+[role="menu"],
+.dropdown-menu {
+  position: absolute !important;
+  z-index: 1000 !important;
+  background: #FFFFFF !important;
+  color: #121316 !important;
+  border: 1px solid #E5DFD4 !important;
+  box-shadow: 0 16px 36px -4px rgba(18, 19, 22, 0.12),
+              0 4px 12px 0 rgba(18, 19, 22, 0.06) !important;
+  border-radius: 1rem !important;
+  max-width: calc(100vw - 2rem) !important;
+  box-sizing: border-box;
+}
+
+/* Crextio Smooth Lift & Hover Glow */
+@media (hover: hover) and (pointer: fine) {
+  .card-dark:hover,
+  .dashboard-card:hover,
+  .candidate-card:hover,
+  .wcr-card:hover,
+  .card-light:hover,
+  .candidate-card-light:hover,
+  .glass-card:hover,
+  .glass-panel:hover,
+  .glass-panel-elevated:hover,
+  .glass-panel-subtle:hover,
+  [title*="Click to view"]:hover {
+    transform: translateY(-2px) !important;
+    background: #FFFFFF !important;
+    border-color: #D5CEBF !important;
+    box-shadow: 0 12px 32px -4px rgba(18, 19, 22, 0.07),
+                0 4px 10px -2px rgba(18, 19, 22, 0.03) !important;
+  }
+}
+
+/* ========================================================
+   CREXTIO TYPOGRAPHY & TEXT SYSTEM
+   - High-contrast Charcoal Black (#121316) for headings & primary text
+   - Deep Slate Grey (#383B42) for secondary labels & metadata (10.5:1 contrast)
+   - Deep Bronze Amber (#7E5A0B) for accents on light backgrounds
+   - Crisp Pure White (#FFFFFF) on dark buttons, badges, and pills
+   ======================================================== */
+h1, h2, h3, h4, h5, h6,
+p:not(.text-on-dark):not([class*="bg-[#121316]"] *):not([class*="bg-black"] *):not([class*="bg-slate-900"] *):not([class*="bg-emerald-"] *):not([class*="bg-rose-"] *):not([class*="bg-blue-"] *),
+li:not(.text-on-dark):not([class*="bg-[#121316]"] *):not([class*="bg-black"] *):not([class*="bg-slate-900"] *),
+dd, dt,
+label, .label,
+th, td,
+strong:not(.text-on-dark):not([class*="bg-[#121316]"] *):not([class*="bg-black"] *):not([class*="bg-slate-900"] *),
+b:not(.text-on-dark):not([class*="bg-[#121316]"] *):not([class*="bg-black"] *):not([class*="bg-slate-900"] *),
+small:not(.text-on-dark):not([class*="bg-[#121316]"] *):not([class*="bg-black"] *):not([class*="bg-slate-900"] *),
+input, textarea, select,
+.font-bold:not(.text-on-dark):not([class*="bg-[#121316]"] *):not([class*="bg-black"] *):not([class*="bg-slate-900"] *),
+.font-semibold:not(.text-on-dark):not([class*="bg-[#121316]"] *):not([class*="bg-black"] *):not([class*="bg-slate-900"] *),
+.candidate-name, .candidate-role,
+[class*="text-[#E0E0E0]"],
+[class*="text-[#202124]"] {
+  color: #121316 !important;
+}
+
+/* Secondary, Helper & Muted Typography — Upgraded to #383B42 for deep, sharp contrast */
+.text-muted,
+.sublabel,
+.candidate-meta,
+[class*="text-[#5F6368]"]:not(.text-on-dark),
+[class*="text-[#70757A]"]:not(.text-on-dark),
+[class*="text-[#8C9199]"]:not(.text-on-dark),
+[class*="text-[#6F727A]"]:not(.text-on-dark),
+[class*="text-[#AEB7C4]"]:not(.text-on-dark),
+[class*="text-[#BDBDBD]"]:not(.text-on-dark),
+[class*="text-slate-400"]:not(.text-on-dark),
+[class*="text-slate-500"]:not(.text-on-dark),
+[class*="text-gray-400"]:not(.text-on-dark),
+[class*="text-gray-500"]:not(.text-on-dark),
+[class*="text-zinc-400"]:not(.text-on-dark) {
+  color: #383B42 !important;
+}
+
+/* High-contrast amber/gold text on light backgrounds */
+[class*="text-amber-300"]:not([class*="bg-"]):not(.text-on-dark),
+[class*="text-amber-400"]:not([class*="bg-"]):not(.text-on-dark),
+[class*="text-amber-500"]:not([class*="bg-"]):not(.text-on-dark),
+[class*="text-[#9E8243]"]:not(.text-on-dark),
+[class*="text-[#D8BF85]"]:not(.text-on-dark),
+[class*="text-[#E5D2A0]"]:not(.text-on-dark) {
+  color: #7E5A0B !important;
+}
+
+/* Crisp White text on dark buttons, active tabs, and dark indicator badges */
+.text-on-dark,
+button.btn-route-kimmi,
+button.btn-route-kimmi *,
+button[class*="bg-[#121316]"],
+button[class*="bg-[#121316]"] *,
+button[class*="bg-slate-900"],
+button[class*="bg-slate-900"] *,
+button[class*="bg-slate-800"],
+button[class*="bg-slate-800"] *,
+button[class*="bg-black"],
+button[class*="bg-black"] *,
+[class*="bg-slate-950"] .text-white,
+[class*="bg-emerald-600"],
+[class*="bg-emerald-600"] *,
+[class*="bg-rose-600"],
+[class*="bg-rose-600"] *,
+[class*="bg-blue-600"],
+[class*="bg-blue-600"] *,
+.wcr-filter-tab.is-active,
+.wcr-filter-tab.is-active *,
+.wcr-filter-tab.active,
+.wcr-filter-tab.active *,
+.card-pill.is-active,
+.card-pill.is-active *,
+.card-pill.active,
+.card-pill.active * {
+  color: #FFFFFF !important;
+}
+
+
+/* Candidate avatar box: crisp warm white with delicate border */
+.candidate-avatar,
+.card-dark .candidate-avatar,
+.dashboard-card .candidate-avatar,
+.candidate-card .candidate-avatar {
+  background-color: #FAF8F5 !important;
+  color: #121316 !important;
+  border: 1px solid #E5DFD4 !important;
+  border-radius: 0.875rem !important;
+}
+
+/* Dossier links */
+.candidate-dossier-link,
+.card-dark .candidate-dossier-link,
+.dashboard-card .candidate-dossier-link,
+.candidate-card .candidate-dossier-link {
+  color: #121316 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+  font-weight: 700 !important;
+}
+.candidate-dossier-link:hover {
+  color: #6F727A !important;
+}
+
+/* ========================================================
+   CREXTIO BUTTON SYSTEM
+   - Primary Accent: Pale Yellow #F5EB78 with bold charcoal text
+   - Dark Action: Charcoal Black #121316 with white text
+   - Secondary / Ghost: Clean white #FFFFFF with #E5DFD4 border
+   ======================================================== */
+
+/* Primary Action Buttons (Assign Room, Save, Submit, Register) -> Crextio Pale Yellow */
+.btn-assign-room,
+button.btn-primary,
+button[type="submit"]:not(.wcr-filter-tab):not(.card-pill),
+button[class*="from-amber-"],
+button[class*="bg-amber-500"]:not(.wcr-filter-tab):not(.card-pill):not([class*="bg-amber-500/"]),
+button[class*="bg-gradient-to-r"][class*="from-amber"],
+button[class*="bg-gradient-to-r"][class*="from-gold"],
+button[class*="from-[#D8BF85]"],
+button[class*="from-[#E5D2A0]"],
+button[class*="bg-[#E5D2A0]"],
+button[class*="bg-[#F0E5CC]"]:not(.wcr-filter-tab) {
+  background: #F5EB78 !important;
+  color: #121316 !important;
+  font-weight: 700 !important;
+  border: 1px solid #E8DC5F !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 2px 8px rgba(245, 235, 120, 0.32) !important;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-assign-room:hover,
+button.btn-primary:hover,
+button[type="submit"]:not(.wcr-filter-tab):not(.card-pill):hover,
+button[class*="from-amber-"]:hover,
+button[class*="bg-amber-500"]:not(.wcr-filter-tab):not(.card-pill):not([class*="bg-amber-500/"]):hover,
+button[class*="from-[#D8BF85]"]:hover,
+button[class*="from-[#E5D2A0]"]:hover,
+button[class*="bg-[#E5D2A0]"]:hover,
+button[class*="bg-[#F0E5CC]"]:not(.wcr-filter-tab):hover {
+  background: #EFE463 !important;
+  border-color: #DFCE46 !important;
+  box-shadow: 0 4px 14px rgba(245, 235, 120, 0.45) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-assign-room svg,
+button.btn-primary svg,
+button[type="submit"] svg {
+  color: #121316 !important;
+}
+
+/* Secondary & Dark Action Buttons (Quick actions, Route, Cancel) */
+.btn-route-kimmi,
+button.btn-route-kimmi,
+button[class*="bg-[#1F2937]"],
+button[class*="bg-[#141820]"]:not(aside *):not(nav *),
+button[class*="bg-slate-800"],
+button[class*="bg-slate-900"],
+button[class*="bg-slate-950"],
+button[class*="bg-gray-800"],
+button[class*="bg-gray-900"],
+button[class*="bg-zinc-800"] {
+  background-color: #121316 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #121316 !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 2px 6px rgba(18, 19, 22, 0.12) !important;
+  transition: all 200ms ease !important;
+}
+
+.btn-route-kimmi *,
+button.btn-route-kimmi *,
+button[class*="bg-[#1F2937]"] *,
+button[class*="bg-[#141820]"] *,
+button[class*="bg-slate-800"] *,
+button[class*="bg-slate-900"] *,
+button[class*="bg-slate-950"] * {
+  color: #FFFFFF !important;
+}
+
+.btn-route-kimmi:hover,
+button.btn-route-kimmi:hover,
+button[class*="bg-[#1F2937]"]:hover,
+button[class*="bg-[#141820]"]:hover,
+button[class*="bg-slate-800"]:hover,
+button[class*="bg-slate-900"]:hover,
+button[class*="bg-slate-950"]:hover {
+  background-color: #25272D !important;
+  border-color: #25272D !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(18, 19, 22, 0.18) !important;
+}
+
+/* Outline / Ghost Buttons */
+button.btn-secondary,
+button[class*="border"][class*="bg-transparent"],
+button[class*="border"][class*="bg-white/"] {
+  background-color: #FFFFFF !important;
+  border: 1px solid #E5DFD4 !important;
+  color: #121316 !important;
+  border-radius: 0.75rem !important;
+  transition: all 200ms ease !important;
+}
+
+button.btn-secondary:hover,
+button[class*="border"][class*="bg-transparent"]:hover,
+button[class*="border"][class*="bg-white/"]:hover {
+  background-color: #FAF8F5 !important;
+  border-color: #121316 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ========================================================
+   CREXTIO INNER CONTAINERS & CHIPS
+   Soft Sand Cream (#F8F6F0) with hairline border (#EAE5DB)
+   ======================================================== */
+.card-inner,
+.inner-box,
+[class*="bg-[#25272B]"]:not(button):not(.btn-route-kimmi),
+[class*="bg-[#252B36]"],
+[class*="bg-[#2B3340]"],
+[class*="bg-[#343D4C]"],
+.dashboard-card div.bg-black\/30,
+.dashboard-card div.bg-black\/40,
+.dashboard-card div.bg-black\/20,
+.dashboard-card div.bg-white\/5,
+.card-dark div.bg-black\/30,
+.card-dark div.bg-black\/40,
+.card-dark div.bg-white\/5 {
+  background: #F8F6F0 !important;
+  border: 1px solid #EAE5DB !important;
+  color: #121316 !important;
+  border-radius: 0.875rem !important;
+  box-shadow: 0 1px 3px 0 rgba(18, 19, 22, 0.02) !important;
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+/* ========================================================
+   CREXTIO NAVIGATION FILTER TABS & SEGMENTED CONTROLS
+   - Inactive: Clean white with #E5DFD4 border
+   - Active: Bold Charcoal Black #121316 with White text OR Pale Yellow
+   ======================================================== */
+.wcr-filter-tab,
+.card-pill {
+  background: #FFFFFF !important;
+  color: #121316 !important;
+  border: 1px solid #E5DFD4 !important;
+  border-radius: 9999px !important; /* Full pill geometry */
+  transition: all 200ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(18, 19, 22, 0.02) !important;
+  font-weight: 600 !important;
+}
+
+.wcr-filter-tab *,
+.card-pill * {
+  color: #121316 !important;
+}
+
+.wcr-filter-tab:hover:not(.is-active):not(.active),
+.card-pill:hover:not(.is-active):not(.active) {
+  background: #FAF8F5 !important;
+  color: #121316 !important;
+  border-color: #121316 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 3px 8px rgba(18, 19, 22, 0.06) !important;
+}
+
+.wcr-filter-tab.is-active,
+.wcr-filter-tab.active,
+.card-pill.is-active,
+.card-pill.active {
+  background: #121316 !important;
+  color: #FFFFFF !important;
+  border-color: #121316 !important;
+  box-shadow: 0 2px 8px rgba(18, 19, 22, 0.20) !important;
+  font-weight: 700 !important;
+}
+
+.wcr-filter-tab.is-active *,
+.wcr-filter-tab.active *,
+.card-pill.is-active *,
+.card-pill.active * {
+  color: #FFFFFF !important;
+}
+
+.wcr-filter-tab:focus-visible,
+.card-pill:focus-visible {
+  outline: 2px solid #121316 !important;
+  outline-offset: 2px !important;
+}
+
+/* Badges with Crextio Pale Yellow */
+.badge-gold,
+.badge-champagne,
+.badge-yellow {
+  background: #FDFBC9 !important;
+  border: 1px solid #EADB5F !important;
+  color: #121316 !important;
+  border-radius: 9999px !important;
+  font-weight: 700 !important;
+}
+
+/* ========================================================
+   CREXTIO INPUTS: CRISP WHITE WITH WARM CHARCOAL FOCUS
+   ======================================================== */
+.wcr-search-input,
+.glass-input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="search"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+select,
+textarea {
+  background: #FFFFFF !important;
+  border: 1px solid #DCD5C7 !important;
+  color: #121316 !important;
+  border-radius: 0.75rem !important; /* 12px corners */
+  transition: all 200ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+::placeholder,
+input::placeholder,
+textarea::placeholder,
+select::placeholder {
+  color: #6F727A !important;
+  opacity: 0.75 !important;
+}
+
+.wcr-search-input:focus,
+.glass-input:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  background: #FFFFFF !important;
+  border-color: #121316 !important;
+  box-shadow: 0 0 0 2px rgba(18, 19, 22, 0.12) !important;
+  outline: none !important;
+  color: #121316 !important;
+}
+
+/* ========================================================
+   VISITOR & CANDIDATE INTAKE FLOW (Bento Timeline)
+   ======================================================== */
+.intake-flow-container,
+.intake-flow-container:hover,
+.intake-flow-container:focus,
+.intake-flow-container:focus-within,
+.dashboard-card:hover .intake-flow-container,
+.card-dark:hover .intake-flow-container {
+  background: #FFFFFF !important;
+  border: 1px solid #E5DFD4 !important;
+  color: #121316 !important;
+  transform: none !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 4px 16px -2px rgba(18, 19, 22, 0.03) !important;
+}
+
+.intake-stage-card,
+.intake-flow-container .intake-stage-card,
+.intake-flow-container:hover .intake-stage-card:not(:hover):not(.is-selected),
+.dashboard-card:hover .intake-stage-card:not(:hover):not(.is-selected),
+.card-dark:hover .intake-stage-card:not(:hover):not(.is-selected) {
+  background: #FAF8F5 !important;
+  border: 1px solid #EAE5DB !important;
+  color: #121316 !important;
+  border-radius: 1rem !important;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease !important;
+}
+
+.intake-stage-card:hover:not(.is-selected),
+.intake-flow-container .intake-stage-card:hover:not(.is-selected) {
+  background: #FFFFFF !important;
+  border-color: #121316 !important;
+  color: #121316 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px -4px rgba(18, 19, 22, 0.06) !important;
+}
+
+.intake-stage-card.is-selected,
+.intake-stage-card.is-selected:focus,
+.intake-flow-container .intake-stage-card.is-selected,
+.intake-flow-container:hover .intake-stage-card.is-selected {
+  background: #FDFBC9 !important;
+  border-color: #EADB5F !important;
+  color: #121316 !important;
+  box-shadow: 0 0 0 1px #EADB5F, 0 8px 20px -4px rgba(245, 235, 120, 0.35) !important;
+}
+
+.intake-stage-card .intake-icon-badge,
+.intake-flow-container .intake-stage-card .intake-icon-badge {
+  background-color: #FFFFFF !important;
+  border: 1px solid #E5DFD4 !important;
+  border-radius: 0.75rem !important;
+}
+
+/* Anti-Overlay & Clear Statistics Protection for Intake Stage Cards */
+.intake-stage-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.intake-stage-card::before,
+.intake-stage-card::after,
+.intake-stage-count::before,
+.intake-stage-count::after {
+  display: none !important;
+  content: none !important;
+}
+
+.intake-stage-count {
+  position: relative !important;
+  z-index: 10 !important;
+  display: inline-block !important;
+  pointer-events: auto !important;
+}
+
+/* ========================================================
+   MODALS, DETAIL VIEWS, DRAWERS & POPUPS
+   Crextio Style: Crisp white container with 28px rounded corners,
+   charcoal borders, and warm blurred overlay
+   ======================================================== */
+
+/* Modal Backdrop Overlays */
+div.fixed.inset-0.bg-black\/80,
+div.fixed.inset-0.bg-black\/85,
+div.fixed.inset-0.bg-black\/90,
+div.fixed.inset-0.bg-black\/75,
+div.fixed.inset-0.bg-black\/70,
+div.fixed.inset-0.bg-black\/50,
+div.fixed.inset-0.bg-slate-900\/35,
+div.fixed.inset-0[class*="bg-black"],
+div.fixed.inset-0[class*="bg-slate-900"],
+div.fixed.inset-0[class*="bg-[#202124]"],
+div[class*="fixed inset-0"][class*="bg-black"],
+div[class*="fixed inset-0"][class*="bg-[#202124]"] {
+  background-color: rgba(18, 19, 22, 0.40) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+/* Modal and Dialog Containers */
+div[class*="fixed inset-0"] > div[class*="max-w-"],
+div[class*="fixed inset-0"] div[class*="rounded-3xl"]:not([class*="w-9"]):not([class*="w-8"]):not([class*="w-10"]),
+div[class*="fixed inset-0"] div[class*="rounded-2xl"][class*="shadow-"],
+[role="dialog"] > div,
+[role="dialog"] {
+  background: #FFFFFF !important;
+  border: 1px solid #E5DFD4 !important;
+  box-shadow: 0 25px 60px -15px rgba(18, 19, 22, 0.16),
+              0 4px 12px -2px rgba(18, 19, 22, 0.04) !important;
+  border-radius: 1.75rem !important; /* 28px Crextio style */
+  color: #121316 !important;
+}
+
+/* Header & footer bars inside modals and drawers */
+div[class*="fixed inset-0"] div[class*="border-b"],
+div[class*="fixed inset-0"] div[class*="border-t"],
+div[class*="fixed inset-0"] div[class*="bg-slate-950"],
+div[class*="fixed inset-0"] div[class*="bg-slate-900"]:not([class*="max-w-"]),
+div[class*="fixed inset-0"] div[class*="bg-black/"],
+div[class*="fixed inset-0"] div[class*="bg-white/40"],
+div[class*="fixed inset-0"] div[class*="bg-white/30"],
+.glass-panel > div.border-b,
+.glass-panel-elevated > div.border-b,
+.modal-header,
+.modal-footer {
+  background: #FAF8F5 !important;
+  border-color: #EAE5DB !important;
+  color: #121316 !important;
+}
+
+/* ========================================================
+   TABLES & DATA GRIDS
+   Crextio Data Tables: Crisp rows, warm cream header,
+   and subtle hover feedback
+   ======================================================== */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+th {
+  background: #FAF8F5 !important;
+  color: #383B42 !important;
+  font-weight: 700 !important;
+  border-bottom: 1px solid #E5DFD4 !important;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem !important;
+}
+
+td {
+  border-bottom: 1px solid #EFEAE0 !important;
+  color: #121316 !important;
+  padding: 0.875rem 1rem !important;
+}
+
+tr:hover td {
+  background: #FAF8F5 !important;
+}
+
+/* Modal animations */
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-in,
+.modal-animate-enter {
+  animation: modal-enter 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+/* Button & Interactive Element Micro-Feedback */
+button:active:not(:disabled),
+a[role="button"]:active {
+  transform: scale(0.982) translateY(1px);
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Accessible focus visible outlines in Charcoal */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #121316 !important;
+  outline-offset: 2px !important;
+}
+
+/* Prevent unwanted content clipping and layout jitter */
+.min-w-0 {
+  min-width: 0;
+}
+
+/* Reduced Motion Compliance */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .card-dark,
+  .dashboard-card,
+  .candidate-card,
+  .wcr-card,
+  .card-light,
+  .candidate-card-light,
+  .intake-stage-card,
+  [title*="Click to view"] {
+    transform: none !important;
+    transition: none !important;
+    perspective: none !important;
+  }
+}

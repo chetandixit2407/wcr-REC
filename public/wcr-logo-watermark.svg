@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="50 10 320 415" width="100%" height="100%" fill="none">
+  <!-- WCR Monogram Geometric Architecture - White Collar Realty -->
+  <g id="wcr-emblem">
+    <!-- Skyscraper / Office Silhouette Motif -->
+    <path d="M70 300 L70 140 L140 90 L210 140 L210 300 Z" fill="none" stroke="#0B0B0D" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M210 300 L210 70 L280 20 L350 70 L350 300 Z" fill="none" stroke="#0B0B0D" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
+    
+    <!-- Central Collar / Tie Stylized V & W -->
+    <path d="M120 180 L190 290 L260 180" fill="none" stroke="#0B0B0D" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M190 290 L220 340 L250 290" fill="#0B0B0D" />
+    
+    <!-- WCR Brand Typography -->
+    <text x="190" y="375" text-anchor="middle" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="44" fill="#0B0B0D" letter-spacing="6">WCR</text>
+    <text x="190" y="405" text-anchor="middle" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="600" font-size="16" fill="#0B0B0D" letter-spacing="3">WHITE COLLAR REALTY</text>
+  </g>
+</svg>
