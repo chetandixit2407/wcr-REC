@@ -3,8 +3,6 @@ import type {
   CandidateValidationResult,
   ValidationCheckItem,
   ValidationOverallStatus,
-  GovernmentIdType,
-  GovernmentIdDocument,
 } from '../types/index.ts';
 import {
   validatePersonName,

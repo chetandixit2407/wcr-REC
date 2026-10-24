@@ -456,7 +456,6 @@ class EventWorkflowEngine {
           delete sanitizedPayload.metadata.expectedSalary;
           delete sanitizedPayload.metadata.hrNotes;
           delete sanitizedPayload.metadata.hrPrivateNotes;
-          delete sanitizedPayload.metadata.governmentIdNumber;
         }
       }
 

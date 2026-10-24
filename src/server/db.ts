@@ -53,7 +53,6 @@ const defaultFieldVisibility: Record<string, RoleFieldVisibility> = {
     email: true,
     address: true,
     resume: true,
-    governmentId: true,
     validationResults: true,
     livePhoto: true,
     hrNotes: true,
@@ -68,7 +67,6 @@ const defaultFieldVisibility: Record<string, RoleFieldVisibility> = {
     email: true,
     address: true,
     resume: true,
-    governmentId: true,
     validationResults: true,
     livePhoto: true,
     hrNotes: true,
@@ -83,7 +81,6 @@ const defaultFieldVisibility: Record<string, RoleFieldVisibility> = {
     email: true,
     address: true,
     resume: true,
-    governmentId: true,
     validationResults: true,
     livePhoto: true,
     hrNotes: true,
@@ -98,7 +95,6 @@ const defaultFieldVisibility: Record<string, RoleFieldVisibility> = {
     email: true,
     address: true,
     resume: true,
-    governmentId: true,
     validationResults: true,
     livePhoto: true,
     hrNotes: true,
@@ -113,7 +109,6 @@ const defaultFieldVisibility: Record<string, RoleFieldVisibility> = {
     email: true,
     address: true,
     resume: true,
-    governmentId: true,
     validationResults: true,
     livePhoto: true,
     hrNotes: true,
@@ -128,7 +123,6 @@ const defaultFieldVisibility: Record<string, RoleFieldVisibility> = {
     email: true,
     address: false,
     resume: true,
-    governmentId: false,
     validationResults: true,
     livePhoto: true,
     hrNotes: true,
@@ -143,7 +137,6 @@ const defaultFieldVisibility: Record<string, RoleFieldVisibility> = {
     email: true,
     address: true,
     resume: true,
-    governmentId: true,
     validationResults: true,
     livePhoto: true,
     hrNotes: false,
@@ -158,7 +151,6 @@ const defaultFieldVisibility: Record<string, RoleFieldVisibility> = {
     email: false,
     address: false,
     resume: false,
-    governmentId: false,
     validationResults: false,
     livePhoto: false,
     hrNotes: false,
@@ -818,8 +810,8 @@ export function deduplicateCandidatesList(
 
     // Sort group to find best primary record
     group.sort((a, b) => {
-      const aDocs = (a.governmentId ? 2 : 0) + (a.receptionPhotoUrl || a.photoUrl || a.livePhoto ? 2 : 0) + (a.resumeUrl ? 1 : 0);
-      const bDocs = (b.governmentId ? 2 : 0) + (b.receptionPhotoUrl || b.photoUrl || b.livePhoto ? 2 : 0) + (b.resumeUrl ? 1 : 0);
+      const aDocs = (a.receptionPhotoUrl || a.photoUrl || a.livePhoto ? 2 : 0) + (a.resumeUrl ? 1 : 0);
+      const bDocs = (b.receptionPhotoUrl || b.photoUrl || b.livePhoto ? 2 : 0) + (b.resumeUrl ? 1 : 0);
       if (aDocs !== bDocs) return bDocs - aDocs;
 
       const statusRank = (s?: string) => {
@@ -851,7 +843,6 @@ export function deduplicateCandidatesList(
         primary.resumeFileName = dup.resumeFileName;
         primary.resumeMimeType = dup.resumeMimeType;
       }
-      if (!primary.governmentId && dup.governmentId) primary.governmentId = dup.governmentId;
       if (!primary.livePhoto && dup.livePhoto) primary.livePhoto = dup.livePhoto;
       if (!primary.receptionPhotoUrl && dup.receptionPhotoUrl) primary.receptionPhotoUrl = dup.receptionPhotoUrl;
       if (!primary.assignedRoomId && dup.assignedRoomId) primary.assignedRoomId = dup.assignedRoomId;
@@ -1181,32 +1172,27 @@ class DatabaseService {
           HR: {
             ...defaultFieldVisibility.HR,
             ...(parsed.settings.fieldVisibility?.HR || {}),
-            governmentId: true,
             validationResults: true,
           },
           ADMIN: {
             ...defaultFieldVisibility.ADMIN,
             ...(parsed.settings.fieldVisibility?.ADMIN || {}),
-            governmentId: true,
             validationResults: true,
           },
           CEO: {
             ...defaultFieldVisibility.CEO,
             ...(parsed.settings.fieldVisibility?.CEO || {}),
-            governmentId: true,
             validationResults: true,
           },
           SENIOR_HR: {
             ...defaultFieldVisibility.SENIOR_HR,
             ...(parsed.settings.fieldVisibility?.SENIOR_HR || {}),
-            governmentId: true,
             validationResults: true,
           },
           CO_FOUNDER: defaultFieldVisibility.CO_FOUNDER,
           RECEPTION: {
             ...defaultFieldVisibility.RECEPTION,
             ...(parsed.settings.fieldVisibility?.RECEPTION || {}),
-            governmentId: true,
             validationResults: true,
             resume: true,
             email: true,
@@ -1221,7 +1207,6 @@ class DatabaseService {
           },
           PANTRY: {
             ...defaultFieldVisibility.PANTRY,
-            governmentId: false,
             resume: false,
             hrNotes: false,
             salary: false,
@@ -1321,8 +1306,6 @@ class DatabaseService {
         pantryWaterRequired: true,
         requireLivePhoto: true,
         requireResume: true,
-        requireGovernmentId: true,
-        allowedGovernmentIdTypes: ['AADHAAR', 'PAN', 'DRIVING_LICENSE', 'PASSPORT', 'VOTER_ID', 'OTHER'],
         allowedUploadFormats: ['pdf', 'png', 'jpg', 'jpeg'],
         qrSessionExpiryMinutes: 30,
         fieldVisibility: defaultFieldVisibility as any,

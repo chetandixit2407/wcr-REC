@@ -211,29 +211,6 @@ export interface CandidateValidationResult {
 
 }
 
-export type GovernmentIdType = 'AADHAAR' | 'PAN' | 'DRIVING_LICENSE' | 'VOTER_ID' | 'PASSPORT' | 'OTHER';
-
-export interface GovernmentIdDocument {
-  id?: string;
-  candidateId?: string;
-  type?: string;
-  idType?: GovernmentIdType;
-  idTypeName?: string;
-  idNumberMasked?: string;
-  maskedIdNumber?: string;
-  rawIdNumber?: string;
-  verified?: boolean;
-  verificationStatus?: 'VERIFIED' | 'PENDING' | 'REJECTED' | 'NEEDS_REVIEW';
-  uploadedAt?: string;
-  storageKey?: string;
-  originalFileName?: string;
-  mimeType?: string;
-  fileSize?: string;
-  documentDataUrl?: string;
-  fileDataUrl?: string;
-  verificationNotes?: string;
-}
-
 export interface Candidate {
   id: string;
   fullName: string;
@@ -270,10 +247,6 @@ export interface Candidate {
   arrivalPhotoCapturedBy?: string;
   arrivalPhotoCapturedByName?: string;
   photoMetadata?: CandidatePhotoMetadata;
-  governmentId?: GovernmentIdDocument;
-  hasGovernmentId?: boolean;
-  governmentIdFileName?: string;
-  governmentIdFileUrl?: string;
   resumeUrl?: string;
   resumeFileName?: string;
   resumeFileSize?: string;
@@ -310,7 +283,6 @@ export interface Candidate {
   checkedInAt?: string;
   assignedInterviewerName?: string;
   assignedInterviewerId?: string;
-  governmentIdDocument?: GovernmentIdDocument;
   qrVerificationStatus?: string;
   createdAt: string;
   updatedAt: string;
@@ -604,7 +576,6 @@ export interface RoleFieldVisibility {
   resume: boolean;
   validationResults: boolean;
   livePhoto: boolean;
-  governmentId?: boolean;
   hrNotes: boolean;
   interviewStatus: boolean;
   room: boolean;
@@ -617,8 +588,6 @@ export interface OfficeSettings {
   pantryWaterRequired: boolean;
   requireLivePhoto: boolean;
   requireResume: boolean;
-  requireGovernmentId?: boolean;
-  allowedGovernmentIdTypes?: GovernmentIdType[];
   allowedUploadFormats: string[];
   qrSessionExpiryMinutes?: number;
   fieldVisibility: Record<UserRole, RoleFieldVisibility>;

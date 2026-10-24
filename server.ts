@@ -32,8 +32,6 @@ import type {
   CandidateChangeRequest,
   CandidateResumeMetadata,
   CandidatePhotoMetadata,
-  GovernmentIdType,
-  GovernmentIdDocument,
   CandidateValidationResult,
   PasswordResetRequest,
   StaffSession,
@@ -59,10 +57,6 @@ if (!fs.existsSync(RESUMES_DIR)) {
   fs.mkdirSync(RESUMES_DIR, { recursive: true });
 }
 
-const GOV_IDS_DIR = path.resolve(process.cwd(), 'data', 'gov_ids');
-if (!fs.existsSync(GOV_IDS_DIR)) {
-  fs.mkdirSync(GOV_IDS_DIR, { recursive: true });
-}
 
 const PHOTOS_DIR = path.resolve(process.cwd(), 'data', 'photos');
 if (!fs.existsSync(PHOTOS_DIR)) {
@@ -835,10 +829,6 @@ async function startServer() {
       purpose,
       departmentToMeet,
       personToMeet,
-      governmentIdType,
-      governmentIdNumber,
-      governmentIdFileName,
-      governmentIdFileUrl,
       livePhoto,
       resumeUrl,
       resumeFileName,
@@ -872,9 +862,6 @@ async function startServer() {
       resumeUrl ||
       resumeFileName
     );
-
-    const idTypeToValidate = (governmentIdType as GovernmentIdType) || 'AADHAAR';
-    const hasGovId = !!(governmentIdNumber?.trim() || governmentIdFileUrl || governmentIdFileName);
 
     const db = dbService.get();
     let existingSession = db.checkInSessions.find((s) => s.token === token);
@@ -1215,7 +1202,7 @@ async function startServer() {
             actorType: 'USER',
             actorName: savedCandidate.fullName,
             eventType: 'CANDIDATE_CHECK_IN',
-            description: `Candidate checked in. Government ID (${savedCandidate.governmentId?.idTypeName || 'ID'}) and resume verified.`,
+            description: `Candidate checked in. Resume verified.`,
           },
           {
             id: `tl-${Date.now()}-chk-val`,
@@ -1240,7 +1227,7 @@ async function startServer() {
             actorType: 'USER',
             actorName: savedCandidate.fullName,
             action: 'FORM_SUBMITTED',
-            details: `Scheduled check-in submitted with ${savedCandidate.governmentId?.idTypeName} for ${savedCandidate.fullName} (${savedCandidate.position}).`,
+            details: `Scheduled check-in submitted for ${savedCandidate.fullName} (${savedCandidate.position}).`,
             entityId: savedCandidate.id,
             entityType: 'CANDIDATE',
           },
@@ -1505,9 +1492,6 @@ async function startServer() {
       purpose,
       departmentToMeet,
       personToMeet,
-      governmentIdType,
-      governmentIdNumber,
-      governmentIdFileSize,
       livePhoto,
       resumeFileSize,
     } = req.body;
@@ -1517,10 +1501,6 @@ async function startServer() {
     const rawResumeFileName = req.body.resumeFileName || req.body.resumeName;
     const resumeFileName = typeof rawResumeFileName === 'string' && rawResumeFileName.trim() ? rawResumeFileName.trim() : undefined;
 
-    const rawGovIdUrl = req.body.governmentIdDocumentUrl || req.body.governmentIdFileUrl;
-    const governmentIdDocumentUrl = typeof rawGovIdUrl === 'string' && rawGovIdUrl.trim() ? rawGovIdUrl.trim() : undefined;
-    const rawGovIdFileName = req.body.governmentIdFileName || req.body.governmentIdName;
-    const governmentIdFileName = typeof rawGovIdFileName === 'string' && rawGovIdFileName.trim() ? rawGovIdFileName.trim() : undefined;
 
     const resolvedPosition = position?.trim() || purpose?.trim() || 'Visitor / Candidate';
 
@@ -2007,167 +1987,7 @@ async function startServer() {
     });
   });
 
-  // ==========================================
-  // GOVERNMENT ID SECURE VIEW & FETCH (INLINE FOR AUTHORIZED ROLES)
-  // Endpoints: /api/candidates/:candidateId/government-id AND /api/candidates/:candidateId/govid/view
-  // ==========================================
-  const handleGovernmentIdRequest = (req: Request, res: Response, isDownload = false) => {
-    const { candidateId } = req.params;
-    const db = dbService.get();
-    const auth = authenticateStaffRequest(req, db.users);
 
-    if (!auth.authenticated || !auth.user) {
-      console.warn(`[AUTH] candidate document access denied: unauthenticated attempt for ${candidateId}`);
-      return res.status(401).json({ success: false, error: 'Unauthorized: Staff authentication required to access Government ID documents.' });
-    }
-
-    const role = auth.user.role;
-    const permissions = auth.effectivePermissions || [];
-    const hasGovIdPermission =
-      permissions.includes('ALL_PERMISSIONS') ||
-      permissions.includes('FULL_ACCESS') ||
-      permissions.includes('candidate.government_id.view') ||
-      permissions.includes('candidate.documents.view') ||
-      permissions.includes('VIEW_DOCUMENTS') ||
-      ['CEO', 'CO_FOUNDER', 'ADMIN', 'HR', 'RECEPTION'].includes(role);
-
-    if (!hasGovIdPermission || role === 'PANTRY') {
-      console.warn(`[AUTH] candidate document access denied for ${auth.user.name} (${role})`);
-      return res.status(403).json({ success: false, error: 'Access Denied: You do not have permission to access Government ID documents.' });
-    }
-
-    const userName = auth.user.name;
-    const candidate = db.candidates.find((c) => c.id === candidateId);
-
-    if (!candidate || (candidate as any).isDeleted) {
-      return res.status(404).json({ success: false, error: 'Candidate record not found or has been archived' });
-    }
-
-    const govId = candidate.governmentId;
-    const fileName =
-      govId?.originalFileName || candidate.governmentIdFileName || `${candidate.fullName.replace(/\s+/g, '_')}_${govId?.idType || 'GovID'}.pdf`;
-    let mimeType = govId?.mimeType || 'application/pdf';
-
-    const diskPath = path.resolve(GOV_IDS_DIR, `${candidateId}-govid.bin`);
-    let fileBuffer: Buffer | null = null;
-
-    // 1. Prefer candidate's actual uploaded government ID document from dataUrl
-    const rawDocUrl = govId?.documentDataUrl || candidate.governmentIdFileUrl;
-    if (rawDocUrl && rawDocUrl.startsWith('data:')) {
-      const match = rawDocUrl.match(/^data:([^;]+);base64,(.+)$/);
-      if (match) {
-        try {
-          const decoded = Buffer.from(match[2], 'base64');
-          if (decoded && decoded.length > 0 && isValidDocumentBuffer(decoded)) {
-            fileBuffer = decoded;
-            mimeType = match[1] || mimeType;
-            try {
-              fs.writeFileSync(diskPath, fileBuffer);
-            } catch (wErr) {
-              console.warn('Could not cache gov ID to disk', wErr);
-            }
-          }
-        } catch (e) {
-          console.warn('Government ID base64 decode fallback', e);
-        }
-      }
-    }
-
-    // 2. Read from disk if fileBuffer not extracted from dataUrl
-    if (!fileBuffer && fs.existsSync(diskPath)) {
-      try {
-        const existing = fs.readFileSync(diskPath);
-        if (existing && existing.length > 0 && isValidDocumentBuffer(existing)) {
-          fileBuffer = existing;
-        }
-      } catch (rErr) {
-        console.warn('Could not read gov ID from disk', rErr);
-      }
-    }
-
-    // 3. If no government ID exists for this candidate
-    if (!fileBuffer || fileBuffer.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Government ID document not found for this candidate.',
-      });
-    }
-
-    if (!isValidDocumentBuffer(fileBuffer)) {
-      return res.status(422).json({
-        success: false,
-        error: 'Government ID preview unavailable. The uploaded file is missing or corrupted.',
-      });
-    }
-
-    mimeType = detectMimeType(fileBuffer, mimeType, fileName);
-
-    // Audit document access
-    try {
-      dbService.update((draft) => {
-        draft.auditLogs.unshift({
-          id: `aud-${Date.now()}-doc-govid`,
-          timestamp: new Date().toISOString(),
-          actorType: 'USER',
-          actorName: userName,
-          actorRole: role,
-          action: 'DOCUMENT_ACCESSED',
-          details: `Accessed Government ID (${govId?.idTypeName || 'ID'}) for candidate ${candidate.fullName} (Action: ${isDownload ? 'DOWNLOAD' : 'VIEW'}).`,
-          entityId: candidateId,
-          entityType: 'CANDIDATE',
-        });
-      });
-    } catch (auditErr) {
-      console.warn('Failed to record document access audit', auditErr);
-    }
-
-    console.log(`[AUTH] candidate document access granted: ${userName} (${role}) -> Gov ID of ${candidate.fullName} (${mimeType}, ${fileBuffer.length} bytes)`);
-
-    // In-app rendering headers
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `${isDownload ? 'attachment' : 'inline'}; filename="${encodeURIComponent(fileName)}"`);
-    res.setHeader('Content-Length', fileBuffer.length.toString());
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    return res.send(fileBuffer);
-  };
-
-  app.get('/api/candidates/:candidateId/government-id', (req: Request, res: Response) => {
-    return handleGovernmentIdRequest(req, res, false);
-  });
-
-  app.get('/api/candidates/:candidateId/government-id/preview', (req: Request, res: Response) => {
-    return handleGovernmentIdRequest(req, res, false);
-  });
-
-  app.get('/api/candidates/:candidateId/govid/view', (req: Request, res: Response) => {
-    return handleGovernmentIdRequest(req, res, false);
-  });
-
-  app.get('/api/candidates/:candidateId/govid/preview', (req: Request, res: Response) => {
-    return handleGovernmentIdRequest(req, res, false);
-  });
-
-  app.get('/api/candidates/:candidateId/documents/govid/preview', (req: Request, res: Response) => {
-    return handleGovernmentIdRequest(req, res, false);
-  });
-
-  app.get('/api/candidates/:candidateId/documents/government-id/preview', (req: Request, res: Response) => {
-    return handleGovernmentIdRequest(req, res, false);
-  });
-
-  // ==========================================
-  // GOVERNMENT ID SECURE DOWNLOAD (ATTACHMENT)
-  // ==========================================
-  app.get('/api/candidates/:candidateId/govid/download', (req: Request, res: Response) => {
-    return handleGovernmentIdRequest(req, res, true);
-  });
-
-  app.get('/api/candidates/:candidateId/government-id/download', (req: Request, res: Response) => {
-    return handleGovernmentIdRequest(req, res, true);
-  });
 
   // ==========================================
   // RECEPTION DESK LIVE PHOTO CAPTURE
@@ -4791,18 +4611,7 @@ async function startServer() {
           copy.resumeUploadedAt = cand.resumeUploadedAt;
           copy.resumeMetadata = cand.resumeMetadata;
         }
-        if (role !== 'INTERVIEWER' && (visibility.governmentId !== false)) {
-          if (cand.governmentId) {
-            const sanitizedGovId = { ...cand.governmentId };
-            delete (sanitizedGovId as any).rawIdNumber;
-            delete (sanitizedGovId as any).documentDataUrl;
-            delete (sanitizedGovId as any).fileDataUrl;
-            copy.governmentId = sanitizedGovId;
-            copy.hasGovernmentId = true;
-          } else if (cand.hasGovernmentId || cand.governmentIdFileName || cand.governmentIdFileUrl) {
-            copy.hasGovernmentId = true;
-          }
-        }
+
         if (visibility.salary && (role === 'HR' || role === 'ADMIN' || role === 'CEO' || role === 'CO_FOUNDER')) {
           copy.expectedSalary = cand.expectedSalary;
         }
@@ -4880,21 +4689,6 @@ async function startServer() {
       delete (candidateData as any).resumeFileName;
       delete (candidateData as any).resumeFileSize;
     }
-    if (role === 'PANTRY' || role === 'INTERVIEWER' || visibility.governmentId === false) {
-      delete (candidateData as any).governmentId;
-      delete (candidateData as any).hasGovernmentId;
-    } else {
-      if (candidate.governmentId) {
-        const sanitizedGovId = { ...candidate.governmentId };
-        delete (sanitizedGovId as any).rawIdNumber;
-        delete (sanitizedGovId as any).documentDataUrl;
-        delete (sanitizedGovId as any).fileDataUrl;
-        candidateData.governmentId = sanitizedGovId;
-        candidateData.hasGovernmentId = true;
-      } else if (candidate.hasGovernmentId || candidate.governmentIdFileName || candidate.governmentIdFileUrl) {
-        candidateData.hasGovernmentId = true;
-      }
-    }
     if (!visibility.salary || (role !== 'HR' && role !== 'ADMIN' && role !== 'CEO' && role !== 'CO_FOUNDER')) {
       delete (candidateData as any).expectedSalary;
     }
@@ -4906,16 +4700,6 @@ async function startServer() {
       delete (candidateData as any).internalHiringDecisionNotes;
       delete (candidateData as any).managementNotes;
     }
-
-    // Mask Raw Government ID number across all endpoints except when raw export requested by Admin
-    if (candidateData.governmentId) {
-      const sanitizedGovId = { ...candidateData.governmentId };
-      delete (sanitizedGovId as any).rawIdNumber;
-      delete (sanitizedGovId as any).documentDataUrl;
-      delete (sanitizedGovId as any).fileDataUrl;
-      candidateData.governmentId = sanitizedGovId;
-    }
-
     // Ensure photo fields are reliably populated
     candidateData.receptionPhotoUrl = candidate.receptionPhotoUrl || candidate.photoUrl || candidate.arrivalPhoto || candidate.livePhoto;
     candidateData.receptionPhotoCapturedAt = candidate.receptionPhotoCapturedAt || candidate.arrivalPhotoCapturedAt || candidate.livePhotoCapturedAt;
@@ -5391,8 +5175,6 @@ async function startServer() {
       try {
         const resumeFile = path.resolve(RESUMES_DIR, `${id}-resume.bin`);
         if (fs.existsSync(resumeFile)) fs.unlinkSync(resumeFile);
-        const govIdFile = path.resolve(GOV_IDS_DIR, `${id}-govid.bin`);
-        if (fs.existsSync(govIdFile)) fs.unlinkSync(govIdFile);
         const photoFile = path.resolve(PHOTOS_DIR, `${id}-photo.jpg`);
         if (fs.existsSync(photoFile)) fs.unlinkSync(photoFile);
       } catch (fileErr) {
@@ -6892,6 +6674,10 @@ async function startServer() {
 
   // Serve local pdfjs worker assets safely on same origin
   app.use('/pdfjs', express.static(path.resolve(process.cwd(), 'node_modules/pdfjs-dist/build')));
+
+  app.get(['/api/health', '/api/app-info'], (_req: Request, res: Response) => {
+    res.json({ success: true, status: 'HEALTHY', name: 'WCR Office Operations Automation', uptime: process.uptime() });
+  });
 
   // 404 API Catch-all: Ensure all unhandled /api/* requests return JSON, NEVER falling through to SPA HTML
   app.all('/api/*', (req: Request, res: Response) => {
