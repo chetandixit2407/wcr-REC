@@ -139,33 +139,10 @@
 .candidate-card,
 .wcr-card,
 .card-light,
-.candidate-card-light,
-.glass-card,
-.glass-panel,
-.glass-panel-elevated,
-.glass-panel-subtle,
-aside,
-header,
-[class*="bg-[#0B0B0D]"],
-[class*="bg-[#0B0F14]"],
-[class*="bg-[#0F141C]"],
-[class*="bg-[#11161F]"],
-[class*="bg-[#0E131A]"],
-[class*="bg-[#141820]"]:not(button):not(svg),
-[class*="bg-[#17191D]"],
-[class*="bg-[#171D26]"],
-[class*="bg-[#1A1D24]"],
-[class*="bg-[#1B2028]"],
-[class*="bg-[#1B212B]"],
-[class*="bg-[#1F242D]"],
-[class*="bg-[#202124]"]:not(button):not(svg),
-[class*="bg-slate-950"]:not(button):not(input),
-[class*="bg-slate-900"]:not(button):not(input):not(.fixed.inset-0),
-[class*="bg-zinc-950"],
-[class*="bg-zinc-900"],
-[class*="bg-neutral-900"],
-[class*="bg-neutral-950"] {
-  background: #FFFFFF !important;
+.candidate-card-light {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   color: #121316 !important;
   border: 1px solid #E5DFD4 !important;
   box-shadow: 0 4px 20px -2px rgba(18, 19, 22, 0.04),
@@ -178,6 +155,38 @@ header,
   transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
               box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
               border-color 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.glass-card,
+.glass-panel,
+.glass-panel-elevated,
+.glass-panel-subtle {
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  color: #121316 !important;
+  border: 1px solid rgba(229, 223, 212, 0.9) !important;
+  box-shadow: 0 8px 32px 0 rgba(18, 19, 22, 0.04),
+              0 1px 3px 0 rgba(18, 19, 22, 0.02) !important;
+  border-radius: 1.25rem !important;
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+aside,
+header {
+  background: #FFFFFF !important;
+  color: #121316 !important;
+  border: 1px solid #E5DFD4 !important;
+  border-radius: 0 !important;
+  position: relative;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Dedicated Popup, Modal & Dropdown Visibility System */
@@ -800,5 +809,99 @@ textarea:focus-visible {
     transform: none !important;
     transition: none !important;
     perspective: none !important;
+  }
+}
+
+/* ========================================================
+   RESPONSIVE VECTOR WATERMARK CANVAS
+   - Strictly one background watermark element across all screens
+   - Pure scalable SVG with viewBox & preserved aspect ratio
+   - Automatically scales without raster pixelation, distortion, or clipping
+   - Fine-tuned media query dimensions for mobile, tablet, and desktop
+   ======================================================== */
+.wcr-vector-watermark {
+  width: min(88vw, 820px);
+  max-height: 80vh;
+  aspect-ratio: 1200 / 860;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 300ms ease;
+}
+
+/* Mobile Screens (e.g., 320px, 375px, 414px, up to 640px) */
+@media screen and (max-width: 640px) {
+  .wcr-vector-watermark {
+    width: min(92vw, 440px);
+    max-height: 68vh;
+  }
+}
+
+/* Tablet Screens (e.g., 768px, 810px, 834px, up to 1024px) */
+@media screen and (min-width: 641px) and (max-width: 1024px) {
+  .wcr-vector-watermark {
+    width: min(78vw, 650px);
+    max-height: 72vh;
+  }
+}
+
+/* Laptop & Desktop Screens (e.g., 1025px - 1599px: 1366px, 1440px) */
+@media screen and (min-width: 1025px) and (max-width: 1599px) {
+  .wcr-vector-watermark {
+    width: min(58vw, 780px);
+    max-height: 78vh;
+  }
+}
+
+/* High-Resolution & 4K Displays (≥ 1600px, e.g., 1920px+) */
+@media screen and (min-width: 1600px) {
+  .wcr-vector-watermark {
+    width: min(50vw, 840px);
+    max-height: 82vh;
+  }
+}
+
+/* Mobile Landscape Handling */
+@media screen and (max-height: 500px) and (orientation: landscape) {
+  .wcr-vector-watermark {
+    width: min(65vw, 520px);
+    max-height: 85vh;
+  }
+}
+
+/* ========================================================
+   TABLET & MOBILE TEXT OVERFLOW & VIEWPORT SHIELD
+   - Fixes tablet text overflow, word wrapping, and clipped content
+   - Keeps cards, dashboards, modals, and sections readable & within viewport
+   ======================================================== */
+@media screen and (max-width: 1024px) {
+  html, body, #root {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Prevent text overflow in headers, cards, badges, and candidate summaries */
+  .candidate-name,
+  .candidate-role,
+  .intake-stage-label,
+  .dashboard-card h1,
+  .dashboard-card h2,
+  .dashboard-card h3,
+  .card-dark h1,
+  .card-dark h2,
+  .card-dark h3 {
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  /* Table and data grids: keep tables smoothly scrollable without breaking parent card boundaries */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* Prevent dialogue clipping on tablet viewports */
+  [role="dialog"] > div {
+    max-width: calc(100vw - 2rem) !important;
   }
 }

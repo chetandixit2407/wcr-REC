@@ -69,6 +69,7 @@ import { SecondaryOperationsMoreView } from './components/SecondaryOperationsMor
 import { HRSubProfileView } from './components/HRSubProfileView.tsx';
 import { DashboardWatermark } from './components/DashboardWatermark.tsx';
 import { CinematicBackground } from './components/CinematicBackground.tsx';
+import { PostLoginLogoAnimation } from './components/PostLoginLogoAnimation.tsx';
 import { smoothEase, pageMotion } from './utils/motion.ts';
 
 import {
@@ -151,6 +152,8 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState<string>('wcr123');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginSuccess, setLoginSuccess] = useState<string | null>(null);
+  const [showPostLoginAnimation, setShowPostLoginAnimation] = useState<boolean>(false);
+  const [animatingUser, setAnimatingUser] = useState<User | null>(null);
 
   // Internal Office Chat State
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
@@ -223,30 +226,17 @@ export default function App() {
             setStoredStaffToken(tok);
           }
         } else {
-          // Initialize active HR session
-          authenticatedFetch('/api/auth/switch-role', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'HR' }),
-          })
-            .then((r) => safeJson(r, { success: false }))
-            .then((sData) => {
-              if (sData.success) {
-                setCurrentUser(sData.user);
-                setCurrentRole(sData.user.role);
-                setCurrentUserId(sData.user.id);
-                setStoredStaffRole(sData.user.role);
-                const tok = sData.session?.token || sData.token;
-                if (tok) {
-                  setSessionToken(tok);
-                  setStoredStaffToken(tok);
-                }
-              }
-            })
-            .catch((err) => console.warn('Session bootstrap error', err));
+          clearStoredStaffToken();
+          setSessionToken('');
+          setCurrentUser(null);
         }
       })
-      .catch((err) => console.warn('Auth check error', err));
+      .catch((err) => {
+        console.warn('Auth check error', err);
+        clearStoredStaffToken();
+        setSessionToken('');
+        setCurrentUser(null);
+      });
   }, []);
 
   // Listen to popstate for browser back/forward routing
@@ -548,6 +538,7 @@ export default function App() {
     connectionStatus,
     reconnect: reconnectRealtime,
   } = useRealtimeEvents({
+    enabled: Boolean(currentUser && sessionToken),
     role: currentRole,
     userId: currentUserId,
     sessionToken,
@@ -885,11 +876,15 @@ export default function App() {
         setSessionToken(tok);
         setStoredStaffToken(tok);
       }
-      setLoginSuccess(`Signed in as ${data.user.name} (${data.user.role})`);
-      setTimeout(() => {
-        setActiveModal(null);
-        setLoginSuccess(null);
-      }, 1000);
+
+      // Close login modal if open
+      setActiveModal(null);
+      setLoginSuccess(null);
+      setLoginError(null);
+
+      // Trigger post-login logo animation overlay
+      setAnimatingUser(data.user);
+      setShowPostLoginAnimation(true);
     } catch (err: any) {
       setLoginError(err.message || 'Login failed');
     }
@@ -913,7 +908,13 @@ export default function App() {
       clearStoredStaffToken();
       setSessionToken('');
       setCurrentUser(null);
+      setShowPostLoginAnimation(false);
+      setAnimatingUser(null);
       setActiveModal('STAFF_LOGIN');
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', '/staff/login');
+        setRoutePath('/staff/login');
+      }
     }
   };
 
@@ -1192,9 +1193,19 @@ export default function App() {
   // ==========================================
   // UNCONNECTED / UNAUTHENTICATED DASHBOARD ROUTE GUARD
   // ==========================================
-  if (isDashboardRoute && !currentUser) {
+  if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#FAF9F6] text-[#111111] flex items-center justify-center p-4 font-sans relative overflow-hidden selection:bg-[#D8BF85] selection:text-[#111111]">
+        {showPostLoginAnimation && (
+          <PostLoginLogoAnimation
+            userName={animatingUser?.name}
+            userRole={animatingUser?.role || currentRole}
+            onComplete={() => {
+              setShowPostLoginAnimation(false);
+              setAnimatingUser(null);
+            }}
+          />
+        )}
         <CinematicBackground />
         <DashboardWatermark />
         <div className="glass-panel-elevated rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 relative z-10">
@@ -1275,7 +1286,18 @@ export default function App() {
   // ==========================================
   return (
     <div className="h-[100dvh] max-h-[100dvh] bg-[#FAF9F6] text-[#121316] flex font-sans selection:bg-[#F5EB78] selection:text-[#121316] relative overflow-hidden">
-      <CinematicBackground />
+      {/* Post-Login Fullscreen Logo Animation Overlay */}
+      {showPostLoginAnimation && (
+        <PostLoginLogoAnimation
+          userName={animatingUser?.name || currentUser?.name}
+          userRole={animatingUser?.role || currentRole}
+          onComplete={() => {
+            setShowPostLoginAnimation(false);
+            setAnimatingUser(null);
+          }}
+        />
+      )}
+      <CinematicBackground hasSidebar={true} />
       {/* Desktop Glass Sidebar Navigation */}
       <SidebarNav
         currentRole={currentRole}
@@ -1329,6 +1351,8 @@ export default function App() {
               : `WCR Operations: ${currentRole.replace('_', ' ')} Console`
           }
           currentRole={currentRole}
+          currentUser={currentUser}
+          onLogout={handleStaffLogout}
           unreadCount={unreadCount}
           unreadChatCount={unreadChatCount}
           isRealtimeConnected={isRealtimeConnected}

@@ -136,8 +136,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   SUPER_ADMIN: ['ALL_PERMISSIONS', 'FULL_ACCESS'],
 };
 
-// In-memory active staff session store
+// In-memory active staff session store and revocation blacklist
 const staffSessions = new Map<string, StaffSession>();
+const revokedTokens = new Set<string>();
 
 export function calculateEffectivePermissions(user: User): string[] {
   const base = ROLE_PERMISSIONS[user.role] || [];
@@ -176,6 +177,9 @@ export function createStaffSession(user: User, ipAddress?: string): StaffSession
 export function getStaffSession(tokenOrSessionId: string, dbUsers?: User[]): StaffSession | null {
   if (!tokenOrSessionId || typeof tokenOrSessionId !== 'string') return null;
   const clean = tokenOrSessionId.trim();
+  if (revokedTokens.has(clean)) {
+    return null;
+  }
   const session = staffSessions.get(clean);
   if (session) {
     if (new Date() > new Date(session.expiresAt)) {
@@ -185,8 +189,9 @@ export function getStaffSession(tokenOrSessionId: string, dbUsers?: User[]): Sta
     return session;
   }
 
-  // Re-hydrate session across server restarts if token contains valid user ID
+  // Re-hydrate session across server restarts if token contains valid user ID and is not revoked
   if (dbUsers && Array.isArray(dbUsers) && (clean.startsWith('wcr-tok-') || clean.startsWith('wcr-sess-'))) {
+    if (revokedTokens.has(clean)) return null;
     const matchedUser = dbUsers.find((u) => clean.includes(u.id) && u.isActive !== false);
     if (matchedUser) {
       const rehydrated = createStaffSession(matchedUser);
@@ -201,8 +206,11 @@ export function getStaffSession(tokenOrSessionId: string, dbUsers?: User[]): Sta
 export function revokeStaffSession(tokenOrSessionId: string): void {
   const clean = tokenOrSessionId?.trim();
   if (!clean) return;
+  revokedTokens.add(clean);
   const session = staffSessions.get(clean);
   if (session) {
+    revokedTokens.add(session.token);
+    revokedTokens.add(session.sessionId);
     staffSessions.delete(session.token);
     staffSessions.delete(session.sessionId);
   }
@@ -248,8 +256,9 @@ export function authenticateStaffRequest(
     (req.headers['x-session-token'] as string) ||
     (req.headers['x-staff-token'] as string) ||
     (req.headers['x-session-id'] as string);
+  const tokenFromQuery = ((req as any).query?.token as string) || ((req as any).query?.sessionToken as string);
 
-  const tokenToTry = (tokenFromHeader || tokenFromCookie)?.trim();
+  const tokenToTry = (tokenFromHeader || tokenFromCookie || tokenFromQuery)?.trim();
 
   if (tokenToTry) {
     const session = getStaffSession(tokenToTry, dbUsers);

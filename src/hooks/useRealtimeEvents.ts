@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { UserRole, DomainEvent } from '../types/index.ts';
-import { getStoredStaffToken, authenticatedFetch, safeJson } from '../utils/apiClient.ts';
+import { getStoredStaffToken, setStoredStaffToken, authenticatedFetch, safeJson } from '../utils/apiClient.ts';
 
 export type RealtimeConnectionStatus = 'connected' | 'reconnecting' | 'disconnected' | 'connecting';
 
@@ -8,6 +8,7 @@ interface RealtimeOptions {
   role?: UserRole;
   userId?: string;
   sessionToken?: string;
+  enabled?: boolean;
   onEvent?: (event: { type: string; payload?: any; eventId?: string; timestamp?: string }) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -18,6 +19,7 @@ export function useRealtimeEvents({
   role = 'HR',
   userId = '',
   sessionToken = '',
+  enabled = true,
   onEvent,
   onConnect,
   onDisconnect,
@@ -120,6 +122,12 @@ export function useRealtimeEvents({
 
   // Main SSE Connect implementation using streaming fetch with Bearer token authentication
   const connect = useCallback((isManualRetry = false) => {
+    if (!enabled) {
+      cleanupConnection();
+      setConnectionStatus('disconnected');
+      return;
+    }
+
     if (isManualRetry) {
       retryAttemptsRef.current = 0;
     }
@@ -133,13 +141,7 @@ export function useRealtimeEvents({
       return;
     }
 
-    const activeToken = (sessionToken || getStoredStaffToken() || '').trim();
-    if (!activeToken) {
-      // Without staff authentication token, do not attempt to hit protected /api/events
-      console.log('[SSE] No active staff session token available. Awaiting authentication bootstrap.');
-      setConnectionStatus('disconnected');
-      return;
-    }
+    let activeToken = (sessionToken || getStoredStaffToken() || '').trim();
 
     isConnectingRef.current = true;
     setConnectionStatus(hasConnectedBeforeRef.current ? 'reconnecting' : 'connecting');
@@ -147,27 +149,29 @@ export function useRealtimeEvents({
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // Timeout guard: If handshake is not completed within 12 seconds, abort and handle backoff
+    // Timeout guard: Allow up to 25s for cloud proxy handshake before retry
     connectTimeoutRef.current = setTimeout(() => {
       if (isConnectingRef.current) {
-        console.warn('[SSE] Connection attempt timed out after 12s');
+        console.warn('[SSE] Connection attempt timed out after 25s');
         controller.abort();
       }
-    }, 12000);
+    }, 25000);
 
     const queryParams = new URLSearchParams();
     if (role) queryParams.set('role', role);
     if (userId) queryParams.set('userId', userId);
-    // Never expose token in URL parameters
+    if (activeToken) queryParams.set('token', activeToken);
     const url = `/api/events?${queryParams.toString()}`;
 
     const headers: Record<string, string> = {
       Accept: 'text/event-stream',
       'Cache-Control': 'no-cache',
-      Authorization: `Bearer ${activeToken}`,
-      'x-staff-token': activeToken,
-      'x-session-token': activeToken,
     };
+    if (activeToken) {
+      headers['Authorization'] = `Bearer ${activeToken}`;
+      headers['x-staff-token'] = activeToken;
+      headers['x-session-token'] = activeToken;
+    }
     if (role) headers['x-user-role'] = role;
 
     (async () => {
@@ -185,11 +189,35 @@ export function useRealtimeEvents({
         }
 
         if (response.status === 401 || response.status === 403) {
-          console.warn(`[SSE] Server rejected authentication (HTTP ${response.status}). Stream stopped.`);
-          isConnectingRef.current = false;
-          setConnectionStatus('disconnected');
-          onDisconnectRef.current?.();
-          return;
+          if (!enabled) {
+            isConnectingRef.current = false;
+            setConnectionStatus('disconnected');
+            onDisconnectRef.current?.();
+            return;
+          }
+          console.warn(`[SSE] Server returned ${response.status}. Attempting session refresh...`);
+          try {
+            const refreshRes = await fetch('/api/auth/switch-role', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ role: role || 'HR', userId: userId || undefined }),
+            });
+            if (refreshRes.ok) {
+              const refreshData = await refreshRes.json();
+              const newToken = refreshData.session?.token || refreshData.token;
+              if (newToken) {
+                setStoredStaffToken(newToken);
+                console.log('[SSE] Session refreshed. Reconnecting...');
+                setTimeout(() => connect(true), 300);
+                return;
+              }
+            }
+          } catch (refreshErr) {
+            console.warn('[SSE] Auto-refresh failed', refreshErr);
+          }
+
+          throw new Error(`HTTP ${response.status}: Session authentication failed`);
         }
 
         if (!response.ok) {
@@ -303,36 +331,35 @@ export function useRealtimeEvents({
         isConnectingRef.current = false;
         onErrorRef.current?.(err);
 
-        // Schedule recovery with bounded exponential backoff
+        // Resilient auto-reconnection with bounded exponential backoff
         const attempts = retryAttemptsRef.current;
         retryAttemptsRef.current += 1;
-
-        if (attempts >= 10) {
-          console.warn('[SSE] Exceeded maximum retry attempts (10). Marking disconnected.');
-          setConnectionStatus('disconnected');
-          onDisconnectRef.current?.();
-          return;
-        }
 
         setConnectionStatus('reconnecting');
         onDisconnectRef.current?.();
 
-        // Bounded exponential backoff with jitter: 1s -> 1.5s -> 2.25s ... up to 30s
+        // Bounded backoff: 1s -> 2s -> 4s ... capped at 15s with jitter
         const backoffMs = Math.min(
-          1000 * Math.pow(1.5, Math.min(attempts, 8)) + Math.random() * 500,
-          30000
+          1000 * Math.pow(1.3, Math.min(attempts, 8)) + Math.random() * 400,
+          15000
         );
 
-        console.log(`[SSE] Reconnecting in ${Math.round(backoffMs)}ms (attempt ${attempts + 1}/10)...`);
+        console.log(`[SSE] Reconnecting in ${Math.round(backoffMs)}ms (attempt ${attempts + 1})...`);
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
         }, backoffMs);
       }
     })();
-  }, [role, userId, sessionToken, cleanupConnection, resyncMissedEvents]);
+  }, [role, userId, sessionToken, enabled, cleanupConnection, resyncMissedEvents]);
 
   // Connect on mount & whenever credentials change
   useEffect(() => {
+    if (!enabled) {
+      cleanupConnection();
+      setConnectionStatus('disconnected');
+      return;
+    }
+
     connect();
 
     // Reconnect immediately on network recovery
@@ -348,13 +375,13 @@ export function useRealtimeEvents({
       onDisconnectRef.current?.();
     };
 
-    // Reconnect on tab focus / visibility
+    // Reconnect immediately on tab focus / visibility
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !isConnectingRef.current) {
-        // If not connected, attempt gentle reconnect
+      if (document.visibilityState === 'visible') {
         setConnectionStatus((curr) => {
           if (curr !== 'connected') {
-            connect(false);
+            console.log('[SSE] Tab active. Refreshing realtime connection...');
+            connect(true);
           }
           return curr;
         });

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import type { ChatMessage, ChatChannel, User, UserRole, Candidate, Room } from '../types/index.ts';
 import { authenticatedFetch } from '../utils/apiClient.ts';
+import { WhiteCollarRealtyLogo } from './WhiteCollarRealtyLogo.tsx';
 
 interface InternalChatModalProps {
   isOpen: boolean;
@@ -673,10 +674,10 @@ export const InternalChatModal: React.FC<InternalChatModalProps> = ({
                 {/* Messages Scroll Area with Subtle WCR Logo Branding */}
                 <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 bg-[#FAF7F0]/40 relative min-h-0">
                   {/* Subtle centered WCR Watermark Emblem in Chat background */}
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-[0.035] overflow-hidden select-none">
-                    <img
-                      src="/wcr-logo-watermark.svg"
-                      alt=""
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden select-none">
+                    <WhiteCollarRealtyLogo
+                      variant="watermark"
+                      opacity={0.04}
                       className="w-56 h-56 sm:w-72 sm:h-72 object-contain"
                     />
                   </div>

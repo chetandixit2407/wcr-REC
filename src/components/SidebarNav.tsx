@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import type { UserRole, User as UserType } from '../types/index.ts';
 import { useSettings } from '../context/SettingsContext.tsx';
+import { WhiteCollarRealtyLogo } from './WhiteCollarRealtyLogo.tsx';
 
 export type NavSection =
   | 'dashboard'
@@ -190,8 +191,8 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
         <div className="px-1 py-2.5 border-b border-[#EAE5DB] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="w-10 h-10 rounded-2xl bg-[#121316] text-[#F5EB78] flex items-center justify-center font-extrabold text-xs shadow-xs tracking-wider border border-[#121316]">
-                WCR
+              <div className="w-10 h-10 rounded-2xl bg-white border border-[#E5DFD4] shadow-xs flex items-center justify-center p-1 overflow-hidden">
+                <WhiteCollarRealtyLogo variant="full" opacity={1} className="w-full h-full object-contain" />
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#FAF7F0]" />
             </div>
@@ -547,11 +548,14 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
 
               {onLogout && (
                 <button
+                  type="button"
                   onClick={onLogout}
-                  className="p-1.5 rounded-lg text-[#6F727A] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                  title={t('btn_sign_out')}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 border border-rose-200 transition cursor-pointer text-xs font-bold shrink-0"
+                  title="Logout of Staff Console"
+                  aria-label="Logout"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>Logout</span>
                 </button>
               )}
             </div>

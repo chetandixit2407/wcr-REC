@@ -17,11 +17,14 @@ import {
   Clock,
   Volume2,
   VolumeX,
+  LogOut,
+  User,
 } from 'lucide-react';
-import type { UserRole } from '../types/index.ts';
+import type { UserRole, User as UserType } from '../types/index.ts';
 import { PWAInstallButton } from './PWAInstallButton.tsx';
 import { useSettings } from '../context/SettingsContext.tsx';
 import { unlockSpeechSynthesis } from '../utils/voiceAlertService.ts';
+import { WhiteCollarRealtyLogo } from './WhiteCollarRealtyLogo.tsx';
 
 export interface OpenPanelItem {
   id: string;
@@ -32,6 +35,8 @@ export interface OpenPanelItem {
 interface TopHeaderProps {
   pageTitle?: string;
   currentRole: UserRole;
+  currentUser?: UserType | null;
+  onLogout?: () => void;
   unreadCount: number;
   unreadChatCount?: number;
   isRealtimeConnected: boolean;
@@ -53,6 +58,8 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({
   pageTitle = 'Operations Command Center',
   currentRole,
+  currentUser,
+  onLogout,
   unreadCount,
   unreadChatCount = 0,
   isRealtimeConnected,
@@ -78,7 +85,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     <header className="sticky top-0 z-20 px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-b border-[#E5DFD4] bg-[#FAF7F0]/90 backdrop-blur-md transition-all shadow-xs text-[#121316]">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 sm:gap-6">
         {/* Left: Mobile trigger & Page Context */}
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
           {onToggleMobileMenu && (
             <button
               onClick={onToggleMobileMenu}
@@ -88,6 +95,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               <Menu className="w-5 h-5" />
             </button>
           )}
+
+          <div className="lg:hidden w-8 h-8 rounded-xl bg-white border border-[#E5DFD4] shadow-xs flex items-center justify-center p-0.5 overflow-hidden shrink-0">
+            <WhiteCollarRealtyLogo variant="full" opacity={1} className="w-full h-full object-contain" />
+          </div>
 
           <div className="space-y-0.5 min-w-0">
             <h1 className="text-base sm:text-lg md:text-xl font-extrabold text-[#121316] tracking-tight leading-snug truncate">
@@ -180,7 +191,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           {currentRole !== 'PANTRY' && (
             <button
               onClick={onOpenCheckIn}
-              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF8F5] border border-[#E5DFD4] text-[#121316] font-semibold text-xs sm:text-[13px] transition cursor-pointer shadow-xs"
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF8F5] border border-[#E5DFD4] text-[#121316] font-semibold text-xs sm:text-[13px] transition cursor-pointer shadow-xs"
               title="Candidate Self Check-In Form"
             >
               <Smartphone className="w-4 h-4 text-[#121316]" />
@@ -192,7 +203,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           {currentRole !== 'PANTRY' && (
             <button
               onClick={onOpenQRPasses}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF8F5] border border-[#E5DFD4] text-[#121316] font-medium text-xs sm:text-[13px] transition cursor-pointer shadow-xs"
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF8F5] border border-[#E5DFD4] text-[#121316] font-medium text-xs sm:text-[13px] transition cursor-pointer shadow-xs"
               title="WCR QR Codes & Passes"
             >
               <QrCode className="w-4 h-4 text-[#121316]" />
@@ -271,6 +282,37 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
           {/* PWA Install */}
           <PWAInstallButton />
+
+          {/* Dedicated Visible Logout Button & User Profile */}
+          {onLogout && (
+            <div className="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2.5 border-l border-[#E5DFD4] shrink-0">
+              {currentUser && (
+                <div
+                  className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white border border-[#E5DFD4] shadow-xs select-none"
+                  title={`Signed in as ${currentUser.name} (${currentRole})`}
+                >
+                  <div className="w-6 h-6 rounded-lg bg-[#F5EB78] text-[#121316] font-extrabold text-[11px] flex items-center justify-center shrink-0 border border-[#E8DC5F]">
+                    {currentUser.name ? currentUser.name.slice(0, 2).toUpperCase() : 'ST'}
+                  </div>
+                  <div className="text-left leading-tight">
+                    <p className="text-xs font-bold text-[#121316] max-w-[90px] truncate">{currentUser.name}</p>
+                    <p className="text-[10px] text-[#6F727A] font-semibold font-mono uppercase">{currentRole}</p>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 hover:border-rose-300 font-bold text-xs sm:text-[13px] transition cursor-pointer shadow-xs active:scale-95 shrink-0"
+                title="Logout of Staff Console"
+                aria-label="Logout"
+              >
+                <LogOut className="w-4 h-4 text-rose-600 shrink-0" />
+                <span className="font-bold">Logout</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -1,21 +1,42 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { smoothEase } from '../utils/motion.ts';
+import { WhiteCollarRealtyLogo } from './WhiteCollarRealtyLogo.tsx';
+
+interface DashboardWatermarkProps {
+  opacity?: number;
+  className?: string;
+  standalone?: boolean;
+}
 
 /**
- * Large, semi-transparent White Collar Realty logo watermark.
- * Positioned centrally within the main dashboard content area,
- * completely behind cards, navigation, modals, and operational sections.
+ * Large, semi-transparent White Collar Realty vector logo watermark.
  *
- * - Genuine transparent background (no solid rectangle or box)
- * - Exact building silhouette emblem, collar/tie motif, and typography
- * - Dark charcoal / black monochrome appearance with ~11% opacity (within 8-15% range)
- * - Pointer-events: none so clicks and scrolls pass through completely
- * - Sized ~300-400px wide on desktop with responsive scaling
- * - Subtle, smooth initial fade-in without any distracting loops or motion
+ * - Integrated with WhiteCollarRealtyLogo vector SVG component
+ * - Features exact building silhouette emblem, collar/tie motif, brand name, and tagline
+ * - By default, delegates to fixed CinematicBackground to guarantee strictly ONE watermark in the DOM
+ * - Can be rendered directly when standalone={true}
  */
-export const DashboardWatermark: React.FC = () => {
-  return null;
+export const DashboardWatermark: React.FC<DashboardWatermarkProps> = ({
+  standalone = false,
+  opacity = 0.08,
+  className = 'wcr-vector-watermark',
+}) => {
+  if (!standalone) {
+    // CinematicBackground already renders the fixed, single vector watermark
+    return null;
+  }
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none select-none flex items-center justify-center p-4"
+    >
+      <WhiteCollarRealtyLogo
+        variant="watermark"
+        opacity={opacity}
+        className={className}
+      />
+    </div>
+  );
 };
 
 export default DashboardWatermark;

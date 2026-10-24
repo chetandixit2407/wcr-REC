@@ -23,6 +23,7 @@ import {
 import type { UserRole, User as UserType } from '../types/index.ts';
 import type { NavSection } from './SidebarNav.tsx';
 import { useSettings } from '../context/SettingsContext.tsx';
+import { WhiteCollarRealtyLogo } from './WhiteCollarRealtyLogo.tsx';
 
 interface MobileNavigationProps {
   isOpen: boolean;
@@ -177,8 +178,8 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
             >
               <div className="flex items-center justify-between pb-3 border-b border-[#EAE5DB]">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-[#121316] text-[#F5EB78] flex items-center justify-center font-black text-xs shadow-xs">
-                    WCR
+                  <div className="w-10 h-10 rounded-xl bg-white border border-[#E5DFD4] shadow-xs flex items-center justify-center p-1 overflow-hidden shrink-0">
+                    <WhiteCollarRealtyLogo variant="full" opacity={1} className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <h3 className="text-xs font-bold text-[#121316]">White Collar Realty</h3>
@@ -305,10 +306,13 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
                   </div>
                   {onLogout && (
                     <button
+                      type="button"
                       onClick={onLogout}
-                      className="p-1.5 rounded-lg text-[#6F727A] hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 cursor-pointer transition shadow-xs"
+                      title="Logout of Staff Console"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Logout</span>
                     </button>
                   )}
                 </div>

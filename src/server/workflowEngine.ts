@@ -478,6 +478,9 @@ class EventWorkflowEngine {
 
       try {
         client.res.write(sseMessage);
+        if (typeof client.res.flush === 'function') {
+          client.res.flush();
+        }
         deliveredCount++;
         console.log(
           `[DASHBOARD] recipient resolved: ${client.session.name} (${client.role}) | event delivered: ${domainEvent.eventId}`

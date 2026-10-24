@@ -12,50 +12,43 @@ export type CinematicVariant =
 interface CinematicBackgroundProps {
   variant?: CinematicVariant;
   intensity?: 'normal' | 'subdued' | 'minimal';
+  hasSidebar?: boolean;
 }
 
 /**
- * Screen-responsive White Collar Realty official background canvas.
- * - Dynamically adapts to mobile, tablet, laptop, and desktop screen sizes
- * - Guarantees the emblem, typography, and gold corner arches stay in full view
- *   without awkward cropping on any screen resolution or aspect ratio.
+ * Responsive White Collar Realty official logo background.
+ * - Displays the official White Collar Realty brand emblem centered in the background.
+ * - Perfectly calibrated visibility (opacity ~0.35 - 0.42) so the skyline, silver collar,
+ *   brand name, and tagline are clearly recognizable.
+ * - Fluid responsive sizing across mobile (320px/375px), tablet (768px/1024px), laptop (1366px), and desktop (1920px+).
+ * - Offsets on desktop to center cleanly in the main operations viewport.
+ * - Single background element prevents duplication, distortion, or unwanted cropping.
+ * - Works harmoniously with transparent frosted glass panels so content remains 100% legible.
  */
-export const CinematicBackground: React.FC<CinematicBackgroundProps> = ({ intensity = 'normal' }) => {
-  const opacityClass =
+export const CinematicBackground: React.FC<CinematicBackgroundProps> = ({
+  intensity = 'normal',
+  hasSidebar = false,
+}) => {
+  const opacityValue =
     intensity === 'minimal'
-      ? 'opacity-40 sm:opacity-50'
+      ? 0.28
       : intensity === 'subdued'
-      ? 'opacity-65 sm:opacity-75'
-      : 'opacity-90 sm:opacity-95';
+      ? 0.35
+      : 0.42;
 
   return (
     <div
       aria-hidden="true"
-      className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none bg-[#FAF9F6] flex items-center justify-center"
+      className={`fixed inset-0 ${hasSidebar ? 'lg:left-64' : ''} pointer-events-none z-0 overflow-hidden select-none bg-[#FAF9F6] flex items-center justify-center p-4 sm:p-8 transition-all duration-300`}
     >
-      {/* Background layer for desktop & wide screens */}
-      <div className="absolute inset-0 hidden md:block">
+      {/* Centered White Collar Realty Official Logo in Background */}
+      <div className="relative w-full max-w-[780px] max-h-[78vh] flex items-center justify-center pointer-events-none select-none">
         <img
-          src="/wcr-background-logo.png"
-          alt=""
-          className={`w-full h-full object-cover object-center transition-all duration-300 ${opacityClass}`}
+          src="/assets/aistudio/image_79ede425.png"
+          alt="White Collar Realty - A Tradition Of Trust"
+          className="w-[88vw] sm:w-[72vw] md:w-[60vw] lg:w-[48vw] max-w-[740px] h-auto max-h-[74vh] object-contain drop-shadow-md select-none pointer-events-none"
+          style={{ opacity: opacityValue }}
         />
-      </div>
-
-      {/* Screen-size adaptive container for mobile & tablet screens (prevents text/logo cropping) */}
-      <div className="relative w-full h-full flex items-center justify-center p-2 sm:p-6 md:hidden">
-        <img
-          src="/wcr-background-logo.png"
-          alt=""
-          className={`absolute inset-0 w-full h-full object-cover object-center ${opacityClass}`}
-        />
-        <div className="relative w-[94vw] sm:w-[85vw] max-h-[82vh] flex items-center justify-center">
-          <img
-            src="/wcr-background-logo.png"
-            alt=""
-            className="w-full h-auto max-h-[82vh] object-contain drop-shadow-xs"
-          />
-        </div>
       </div>
     </div>
   );
